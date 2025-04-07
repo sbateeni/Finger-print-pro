@@ -7,7 +7,7 @@ def draw_minutiae_points(image, minutiae_points, radius=3):
     
     Args:
         image: صورة البصمة
-        minutiae_points: قائمة النقاط المميزة (كل نقطة تحتوي على x, y, نوع النقطة, الزاوية)
+        minutiae_points: قائمة النقاط المميزة (كائنات MinutiaePoint)
         radius: نصف قطر الدائرة المرسومة
     
     Returns:
@@ -21,12 +21,12 @@ def draw_minutiae_points(image, minutiae_points, radius=3):
     marked_image = image.copy()
     
     for point in minutiae_points:
-        x, y = int(point[0]), int(point[1])
-        point_type = point[2] if len(point) > 2 else 'ending'  # نوع النقطة (ending أو bifurcation)
-        angle = point[3] if len(point) > 3 else 0  # زاوية النقطة
+        x, y = int(point.x), int(point.y)
+        point_type = point.type
+        angle = point.angle
         
         # لون مختلف لكل نوع من النقاط
-        color = (0, 0, 255) if point_type == 'ending' else (0, 255, 0)  # أحمر للنهايات، أخضر للتفرعات
+        color = (0, 0, 255) if point_type == 'ridge_ending' else (0, 255, 0)
         
         # رسم دائرة عند النقطة
         cv2.circle(marked_image, (x, y), radius, color, -1)
@@ -46,7 +46,7 @@ def draw_matching_lines(image1, image2, matching_pairs, gap=20):
     Args:
         image1: الصورة الأولى
         image2: الصورة الثانية
-        matching_pairs: قائمة من أزواج النقاط المتطابقة
+        matching_pairs: قائمة من أزواج النقاط المتطابقة (كائنات MinutiaePoint)
         gap: المسافة بين الصورتين
     
     Returns:
@@ -78,8 +78,8 @@ def draw_matching_lines(image1, image2, matching_pairs, gap=20):
     # رسم خطوط التطابق
     for i, (p1, p2) in enumerate(matching_pairs):
         color = colors[i % len(colors)]
-        x1, y1 = int(p1[0]), int(p1[1])
-        x2, y2 = int(p2[0]), int(p2[1])
+        x1, y1 = int(p1.x), int(p1.y)
+        x2, y2 = int(p2.x), int(p2.y)
         
         # تعديل إحداثيات النقطة الثانية
         x2 += w1 + gap
