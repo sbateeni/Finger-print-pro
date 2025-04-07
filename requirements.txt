@@ -1,7 +1,8 @@
 Flask==2.0.1
-numpy==2.2.4
+numpy>=1.23.5,<1.29.0
 opencv-python-headless==4.9.0.80
 scikit-image==0.22.0
 scipy==1.12.0
 Werkzeug==2.0.1
-gunicorn==20.1.0 
+gunicorn==20.1.0
+Pillow>=9.0.1 
