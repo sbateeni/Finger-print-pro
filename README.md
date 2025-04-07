@@ -1,60 +1,76 @@
-# Fingerprint Comparison System
+# نظام مقارنة البصمات
 
-A web-based system for comparing and matching fingerprint images using computer vision and pattern recognition techniques.
+نظام ويب لمقارنة البصمات وتحديد نسبة التطابق بينها باستخدام تقنيات معالجة الصور والذكاء الاصطناعي.
 
-## Features
+## المميزات
 
-- Upload and compare two fingerprint images
-- Automatic image preprocessing and enhancement
-- Feature extraction and minutiae point detection
-- Accurate fingerprint matching algorithm
-- Modern and user-friendly web interface
-- Real-time comparison results
-- Support for drag-and-drop file upload
+- معالجة أولية للصور وتحسين جودتها
+- استخراج النقاط المميزة من البصمات
+- مقارنة البصمات وحساب نسبة التطابق
+- عرض مرئي للنقاط المتطابقة
+- واجهة مستخدم سهلة الاستخدام باللغة العربية
 
-## Requirements
+## المتطلبات
 
-- Python 3.7+
+- Python 3.9+
 - Flask
 - OpenCV
 - NumPy
-- Pillow
+- SciPy
 - scikit-image
-- scipy
 
-## Installation
+## التثبيت
 
-1. Clone the repository:
+1. نسخ المستودع:
 ```bash
-git clone https://github.com/yourusername/fingerprint-comparison-system.git
-cd fingerprint-comparison-system
+git clone https://github.com/yourusername/fingerprint-comparison.git
+cd fingerprint-comparison
 ```
 
-2. Create a virtual environment (recommended):
+2. إنشاء بيئة افتراضية:
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
 ```
 
-3. Install the required packages:
+3. تثبيت المتطلبات:
 ```bash
 pip install -r requirements.txt
 ```
 
-## Usage
+## التشغيل
 
-1. Start the Flask server:
+1. تشغيل التطبيق:
 ```bash
 python app.py
 ```
 
-2. Open your web browser and navigate to:
+2. فتح المتصفح على العنوان:
 ```
 http://localhost:5000
 ```
 
-3. Upload two fingerprint images using the web interface
-4. Click the "Compare Fingerprints" button to see the results
+## الاستخدام
+
+1. رفع صورتي البصمات المراد مقارنتهما
+2. النقر على زر "مقارنة البصمات"
+3. انتظار النتائج التي تشمل:
+   - نسبة التطابق
+   - عدد النقاط المميزة في كل بصمة
+   - عرض مرئي للنقاط المتطابقة
+
+## النشر على Render
+
+1. إنشاء حساب على [Render](https://render.com)
+2. ربط المستودع بـ Render
+3. إنشاء خدمة ويب جديدة
+4. تحديد المتغيرات البيئية المطلوبة
+5. النشر تلقائياً
+
+## الترخيص
+
+هذا المشروع مرخص تحت [MIT License](LICENSE).
 
 ## Project Structure
 
@@ -109,10 +125,6 @@ Fingerprint-Comparison-System/
 2. Create a new branch
 3. Make your changes
 4. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgments
 

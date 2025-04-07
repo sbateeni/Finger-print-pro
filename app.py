@@ -6,6 +6,7 @@ from fingerprint.preprocessor import preprocess_image
 from fingerprint.feature_extractor import extract_features
 from fingerprint.matcher import compare_fingerprints
 import cv2
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -18,12 +19,13 @@ UPLOAD_FOLDER = os.path.join('static', 'uploads')
 ORIGINAL_FOLDER = os.path.join(UPLOAD_FOLDER, 'original')
 PROCESSED_FOLDER = os.path.join(UPLOAD_FOLDER, 'processed')
 
+# Ensure upload folders exist
+for folder in [UPLOAD_FOLDER, ORIGINAL_FOLDER, PROCESSED_FOLDER]:
+    os.makedirs(folder, exist_ok=True)
+
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
-
-# Create upload directories if they don't exist
-os.makedirs(ORIGINAL_FOLDER, exist_ok=True)
-os.makedirs(PROCESSED_FOLDER, exist_ok=True)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-secret-key')
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
@@ -127,6 +129,21 @@ def upload_files():
         logger.error(f'حدث خطأ: {str(e)}')
         return jsonify({'error': str(e)}), 500
 
+# Clean up uploaded files periodically
+def cleanup_old_files():
+    """
+    تنظيف الملفات القديمة من مجلدات التحميل
+    """
+    try:
+        for folder in [ORIGINAL_FOLDER, PROCESSED_FOLDER]:
+            for filename in os.listdir(folder):
+                file_path = os.path.join(folder, filename)
+                # حذف الملفات الأقدم من ساعة
+                if os.path.getmtime(file_path) < time.time() - 3600:
+                    os.remove(file_path)
+    except Exception as e:
+        logger.error(f'فشل في تنظيف الملفات القديمة: {str(e)}')
+
 if __name__ == '__main__':
-    logger.info('بدء تشغيل التطبيق')
-    app.run(debug=True) 
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port) 
