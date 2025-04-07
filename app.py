@@ -5,6 +5,7 @@ from werkzeug.utils import secure_filename
 from fingerprint.preprocessor import preprocess_image
 from fingerprint.feature_extractor import extract_features
 from fingerprint.matcher import compare_fingerprints
+from fingerprint.visualization import draw_minutiae_points, draw_matching_lines
 import cv2
 import time
 
