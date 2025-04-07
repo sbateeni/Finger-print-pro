@@ -138,3 +138,30 @@ def filter_minutiae(minutiae_points, binary_image, min_distance=10):
             filtered.append(point)
     
     return filtered 
+
+def draw_minutiae_points(image, minutiae_points):
+    """
+    رسم النقاط المميزة على صورة البصمة
+    """
+    # نسخ الصورة للرسم عليها
+    result = cv2.cvtColor(image.copy(), cv2.COLOR_GRAY2BGR)
+    
+    # رسم كل نقطة مع لونها المميز
+    for point in minutiae_points:
+        x, y = int(point.x), int(point.y)
+        if point.type == 'ridge_ending':
+            # نقاط النهاية باللون الأحمر
+            cv2.circle(result, (x, y), 5, (0, 0, 255), -1)
+            # رسم خط يشير إلى الاتجاه
+            dx = int(15 * np.cos(point.angle))
+            dy = int(15 * np.sin(point.angle))
+            cv2.line(result, (x, y), (x + dx, y + dy), (0, 0, 255), 2)
+        else:
+            # نقاط التفرع باللون الأخضر
+            cv2.circle(result, (x, y), 5, (0, 255, 0), -1)
+            # رسم خط يشير إلى الاتجاه
+            dx = int(15 * np.cos(point.angle))
+            dy = int(15 * np.sin(point.angle))
+            cv2.line(result, (x, y), (x + dx, y + dy), (0, 255, 0), 2)
+    
+    return result 

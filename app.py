@@ -79,13 +79,6 @@ def upload_files():
             logger.error(f'فشل في معالجة الصور: {str(e)}')
             return jsonify({'error': 'فشل في معالجة الصور'}), 500
         
-        # Save processed images
-        processed_fp1_path = os.path.join(PROCESSED_FOLDER, f'processed_{fp1_filename}')
-        processed_fp2_path = os.path.join(PROCESSED_FOLDER, f'processed_{fp2_filename}')
-        cv2.imwrite(processed_fp1_path, processed_fp1)
-        cv2.imwrite(processed_fp2_path, processed_fp2)
-        logger.info('تم حفظ الصور المعالجة')
-        
         # Extract features
         logger.info('بدء استخراج المميزات')
         try:
@@ -94,6 +87,19 @@ def upload_files():
             if not features1 or not features2:
                 raise Exception('فشل في استخراج المميزات من الصور')
             logger.info(f'تم استخراج {len(features1)} نقطة مميزة من الصورة الأولى و {len(features2)} من الصورة الثانية')
+            
+            # رسم النقاط المميزة على الصور
+            marked_fp1 = draw_minutiae_points(processed_fp1, features1)
+            marked_fp2 = draw_minutiae_points(processed_fp2, features2)
+            
+            # حفظ الصور مع النقاط المميزة
+            marked_fp1_filename = f'marked_{fp1_filename}'
+            marked_fp2_filename = f'marked_{fp2_filename}'
+            marked_fp1_path = os.path.join(PROCESSED_FOLDER, marked_fp1_filename)
+            marked_fp2_path = os.path.join(PROCESSED_FOLDER, marked_fp2_filename)
+            cv2.imwrite(marked_fp1_path, marked_fp1)
+            cv2.imwrite(marked_fp2_path, marked_fp2)
+            
         except Exception as e:
             logger.error(f'فشل في استخراج المميزات: {str(e)}')
             return jsonify({'error': 'فشل في استخراج المميزات من الصور'}), 500
@@ -103,24 +109,29 @@ def upload_files():
         try:
             match_score, matching_points = compare_fingerprints(features1, features2)
             logger.info(f'نتيجة المقارنة: {match_score:.2%}, عدد النقاط المتطابقة: {len(matching_points)}')
+            
+            # رسم خطوط التطابق بين البصمتين
+            matching_lines = draw_matching_lines(marked_fp1, marked_fp2, list(zip(features1, features2)))
+            matching_filename = f'matching_{fp1_filename}'
+            matching_path = os.path.join(PROCESSED_FOLDER, matching_filename)
+            cv2.imwrite(matching_path, matching_lines)
+            
         except Exception as e:
             logger.error(f'فشل في مقارنة البصمات: {str(e)}')
             return jsonify({'error': 'فشل في مقارنة البصمات'}), 500
         
         # Generate URLs for the images
-        fp1_url = url_for('static', filename=f'uploads/original/{fp1_filename}')
-        fp2_url = url_for('static', filename=f'uploads/original/{fp2_filename}')
-        processed_fp1_url = url_for('static', filename=f'uploads/processed/processed_{fp1_filename}')
-        processed_fp2_url = url_for('static', filename=f'uploads/processed/processed_{fp2_filename}')
+        marked_fp1_url = url_for('static', filename=f'uploads/processed/{marked_fp1_filename}')
+        marked_fp2_url = url_for('static', filename=f'uploads/processed/{marked_fp2_filename}')
+        matching_url = url_for('static', filename=f'uploads/processed/{matching_filename}')
         
         return jsonify({
             'success': True,
             'match_score': match_score,
             'matching_points': matching_points,
-            'original1': fp1_url,
-            'original2': fp2_url,
-            'processed1': processed_fp1_url,
-            'processed2': processed_fp2_url,
+            'marked1': marked_fp1_url,
+            'marked2': marked_fp2_url,
+            'matching_visualization': matching_url,
             'num_features1': len(features1),
             'num_features2': len(features2)
         })

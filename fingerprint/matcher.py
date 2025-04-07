@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
+import cv2
 
 def align_fingerprints(points1, points2):
     """
@@ -213,4 +214,56 @@ def calculate_match_quality(matching_pairs):
         'num_matches': len(matching_pairs),
         'avg_distance': np.mean(distances),
         'avg_angle_diff': np.mean(angle_diffs)
-    } 
+    }
+
+def draw_matching_lines(image1, image2, matching_pairs):
+    """
+    رسم خطوط التطابق بين البصمتين
+    """
+    # تحديد أبعاد الصورة المجمعة
+    h1, w1 = image1.shape[:2]
+    h2, w2 = image2.shape[:2]
+    h = max(h1, h2)
+    w = w1 + w2 + 20  # إضافة مسافة بين الصورتين
+    
+    # إنشاء صورة مجمعة
+    result = np.zeros((h, w, 3), dtype=np.uint8)
+    
+    # نسخ الصورتين إلى الصورة المجمعة
+    if len(image1.shape) == 2:
+        image1 = cv2.cvtColor(image1, cv2.COLOR_GRAY2BGR)
+    if len(image2.shape) == 2:
+        image2 = cv2.cvtColor(image2, cv2.COLOR_GRAY2BGR)
+    
+    result[0:h1, 0:w1] = image1
+    result[0:h2, w1+20:] = image2
+    
+    # رسم خطوط التطابق
+    colors = [
+        (255, 0, 0),   # أزرق
+        (0, 255, 0),   # أخضر
+        (255, 0, 255), # وردي
+        (0, 255, 255), # أصفر
+        (128, 0, 255), # بنفسجي
+        (255, 128, 0)  # برتقالي
+    ]
+    
+    for i, (p1, p2) in enumerate(matching_pairs):
+        color = colors[i % len(colors)]
+        x1, y1 = int(p1.x), int(p1.y)
+        x2, y2 = int(p2.x) + w1 + 20, int(p2.y)
+        
+        # رسم دوائر عند نقاط التطابق
+        cv2.circle(result, (x1, y1), 5, color, -1)
+        cv2.circle(result, (x2, y2), 5, color, -1)
+        
+        # رسم خط التطابق
+        cv2.line(result, (x1, y1), (x2, y2), color, 2)
+        
+        # إضافة رقم للنقطة المتطابقة
+        cv2.putText(result, str(i+1), (x1-10, y1-10), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        cv2.putText(result, str(i+1), (x2-10, y2-10), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+    
+    return result 

@@ -186,11 +186,36 @@ document.addEventListener('DOMContentLoaded', function() {
                 // Show results div
                 resultsDiv.style.display = 'block';
                 
-                // Update matching points information
+                // Update preview images with processed versions
+                if (data.marked1) previewImages[0].src = data.marked1;
+                if (data.marked2) previewImages[1].src = data.marked2;
+
+                // عرض صورة خطوط التطابق
+                if (data.matching_visualization) {
+                    const matchingVisualization = document.getElementById('matching-visualization');
+                    if (matchingVisualization) {
+                        const img = document.createElement('img');
+                        img.src = data.matching_visualization;
+                        img.style.width = '100%';
+                        img.style.height = 'auto';
+                        img.alt = 'خطوط التطابق بين البصمتين';
+                        
+                        // إزالة أي صور سابقة
+                        matchingVisualization.innerHTML = '';
+                        matchingVisualization.appendChild(img);
+                    }
+                }
+
+                // تحديث معلومات النقاط المميزة
                 matchingPoints.innerHTML = `
-                    <p>عدد النقاط المميزة في البصمة الأولى: ${data.num_features1}</p>
-                    <p>عدد النقاط المميزة في البصمة الثانية: ${data.num_features2}</p>
-                    <p>عدد النقاط المتطابقة: ${data.matching_points.length}</p>
+                    <div class="feature-info">
+                        <p>عدد النقاط المميزة في البصمة الأولى: ${data.num_features1}</p>
+                        <p>عدد النقاط المميزة في البصمة الثانية: ${data.num_features2}</p>
+                        <p>عدد النقاط المتطابقة: ${data.matching_points.length}</p>
+                        <p class="match-details">النقاط الحمراء: نقاط النهاية</p>
+                        <p class="match-details">النقاط الخضراء: نقاط التفرع</p>
+                        <p class="match-details">الخطوط الملونة: مناطق التطابق</p>
+                    </div>
                 `;
                 
                 // Wait for images to load before drawing
