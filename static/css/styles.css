@@ -1,0 +1,234 @@
+* {
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: #f8f9fa;
+    direction: rtl;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.upload-area {
+    position: relative;
+    width: 100%;
+    height: 300px;
+    border: 2px dashed #ccc;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background-color: #fff;
+}
+
+.upload-area.dragover {
+    border-color: #007bff;
+    background-color: rgba(0, 123, 255, 0.05);
+}
+
+.upload-area.has-image {
+    border-style: solid;
+    border-color: #28a745;
+}
+
+.file-input {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 2;
+}
+
+.preview-area {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 20px;
+}
+
+.preview-area img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.upload-text {
+    color: #6c757d;
+    margin: 10px 0;
+    text-align: center;
+    font-size: 1.1rem;
+}
+
+.progress {
+    height: 30px;
+    background-color: #e9ecef;
+    border-radius: 15px;
+    overflow: hidden;
+    margin: 20px 0;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.progress-bar {
+    background-color: #28a745;
+    transition: width 0.6s ease;
+    position: relative;
+}
+
+.match-score {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #28a745;
+    text-align: center;
+    margin: 20px 0;
+}
+
+#matching-points {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+#matching-points p {
+    margin: 10px 0;
+    font-size: 1.1rem;
+    color: #343a40;
+}
+
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: none;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.card-title {
+    color: #343a40;
+    font-weight: 600;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.btn-primary {
+    padding: 0.5rem 2rem;
+    font-weight: 500;
+    border-radius: 25px;
+    font-size: 1.1rem;
+}
+
+.btn-primary:disabled {
+    background-color: #6c757d;
+    border-color: #6c757d;
+}
+
+.alert {
+    border-radius: 8px;
+    margin-top: 1rem;
+    text-align: center;
+}
+
+/* Loading animation */
+.loading {
+    position: relative;
+    pointer-events: none;
+}
+
+.loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    margin: -12px 0 0 -12px;
+    border: 3px solid rgba(255,255,255,0.3);
+    border-top: 3px solid #fff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .upload-area {
+        height: 200px;
+    }
+    
+    .card-title {
+        font-size: 1.2rem;
+    }
+    
+    .upload-text {
+        font-size: 1rem;
+    }
+}
+
+.processing-status {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    font-family: monospace;
+}
+
+.status-item {
+    padding: 5px;
+    margin-bottom: 5px;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.status-item:last-child {
+    border-bottom: none;
+}
+
+.matching-visualization {
+    width: 100%;
+    height: 400px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+}
+
+#matching-canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+#results {
+    padding: 20px;
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#matching-points {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+}
+
+#matching-points p {
+    margin: 10px 0;
+    font-size: 1.1rem;
+    color: #343a40;
+} 
