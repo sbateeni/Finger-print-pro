@@ -72,18 +72,64 @@ body {
 }
 
 .progress {
-    height: 30px;
+    height: 0.5rem;
     background-color: #e9ecef;
-    border-radius: 15px;
-    overflow: hidden;
-    margin: 20px 0;
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .progress-bar {
-    background-color: #28a745;
-    transition: width 0.6s ease;
-    position: relative;
+    background-color: #007bff;
+    transition: width 0.3s ease;
+}
+
+.steps {
+    margin-top: 1rem;
+}
+
+.step {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    background-color: #f8f9fa;
+}
+
+.step-status {
+    margin-right: 0.5rem;
+    font-size: 1.2rem;
+}
+
+.step.completed {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.step.in-progress {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.step.failed {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+#system-info {
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+#system-info div {
+    margin-bottom: 0.25rem;
+}
+
+.alert-danger {
+    color: #721c24;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 10px;
 }
 
 .match-score {

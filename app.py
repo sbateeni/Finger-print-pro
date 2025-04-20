@@ -6,6 +6,7 @@ from fingerprint.preprocessor import preprocess_image
 from fingerprint.feature_extractor import extract_features
 from fingerprint.matcher import compare_fingerprints
 from fingerprint.visualization import draw_minutiae_points, draw_matching_lines
+from fingerprint.performance_monitor import PerformanceMonitor
 import cv2
 import time
 
@@ -30,6 +31,9 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-secret-key')
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
 
+# إنشاء كائن مراقب الأداء
+performance_monitor = PerformanceMonitor()
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -38,12 +42,24 @@ def index():
     logger.info('تم تحميل الصفحة الرئيسية')
     return render_template('index.html')
 
+@app.route('/status')
+def get_status():
+    """الحصول على حالة المعالجة الحالية"""
+    status = performance_monitor.get_current_status()
+    if status:
+        return jsonify(status)
+    return jsonify({'error': 'لا توجد عملية جارية'}), 404
+
 @app.route('/upload', methods=['POST'])
 def upload_files():
     logger.info('بدء عملية رفع الملفات')
     
+    # بدء مراقبة الأداء
+    performance_monitor.start_monitoring(total_steps=5)  # 5 خطوات رئيسية
+    
     if 'fingerprint1' not in request.files or 'fingerprint2' not in request.files:
         logger.error('لم يتم تحديد الملفات المطلوبة')
+        performance_monitor.add_step('رفع الملفات', 'failed')
         return jsonify({'error': 'يجب رفع صورتين للبصمات'}), 400
     
     fp1 = request.files['fingerprint1']
@@ -51,14 +67,17 @@ def upload_files():
     
     if fp1.filename == '' or fp2.filename == '':
         logger.error('لم يتم اختيار الملفات')
+        performance_monitor.add_step('رفع الملفات', 'failed')
         return jsonify({'error': 'لم يتم اختيار الملفات'}), 400
     
     if not (allowed_file(fp1.filename) and allowed_file(fp2.filename)):
         logger.error('نوع الملف غير مدعوم')
+        performance_monitor.add_step('رفع الملفات', 'failed')
         return jsonify({'error': 'نوع الملف غير مدعوم. الأنواع المدعومة هي: PNG, JPG, JPEG, GIF'}), 400
     
     try:
-        # Save original images with secure filenames
+        # حفظ الصور الأصلية
+        performance_monitor.add_step('رفع الملفات')
         fp1_filename = secure_filename(fp1.filename)
         fp2_filename = secure_filename(fp2.filename)
         
@@ -69,18 +88,23 @@ def upload_files():
         fp1.save(fp1_path)
         fp2.save(fp2_path)
         logger.info(f'تم حفظ الصور في: {fp1_path} و {fp2_path}')
+        performance_monitor.update_step('رفع الملفات')
         
-        # Process images
+        # معالجة الصور
+        performance_monitor.add_step('معالجة الصور')
         logger.info('بدء معالجة الصور')
         try:
             processed_fp1 = preprocess_image(fp1_path)
             processed_fp2 = preprocess_image(fp2_path)
             logger.info('تم معالجة الصور بنجاح')
+            performance_monitor.update_step('معالجة الصور')
         except Exception as e:
             logger.error(f'فشل في معالجة الصور: {str(e)}')
+            performance_monitor.update_step('معالجة الصور', 'failed')
             return jsonify({'error': 'فشل في معالجة الصور'}), 500
         
-        # Extract features
+        # استخراج المميزات
+        performance_monitor.add_step('استخراج المميزات')
         logger.info('بدء استخراج المميزات')
         try:
             features1 = extract_features(processed_fp1)
@@ -100,12 +124,15 @@ def upload_files():
             marked_fp2_path = os.path.join(PROCESSED_FOLDER, marked_fp2_filename)
             cv2.imwrite(marked_fp1_path, marked_fp1)
             cv2.imwrite(marked_fp2_path, marked_fp2)
+            performance_monitor.update_step('استخراج المميزات')
             
         except Exception as e:
             logger.error(f'فشل في استخراج المميزات: {str(e)}')
+            performance_monitor.update_step('استخراج المميزات', 'failed')
             return jsonify({'error': 'فشل في استخراج المميزات من الصور'}), 500
         
-        # Compare fingerprints
+        # مقارنة البصمات
+        performance_monitor.add_step('مقارنة البصمات')
         logger.info('بدء مقارنة البصمات')
         try:
             match_score, matching_points = compare_fingerprints(features1, features2)
@@ -116,15 +143,22 @@ def upload_files():
             matching_filename = f'matching_{fp1_filename}'
             matching_path = os.path.join(PROCESSED_FOLDER, matching_filename)
             cv2.imwrite(matching_path, matching_lines)
+            performance_monitor.update_step('مقارنة البصمات')
             
         except Exception as e:
             logger.error(f'فشل في مقارنة البصمات: {str(e)}')
+            performance_monitor.update_step('مقارنة البصمات', 'failed')
             return jsonify({'error': 'فشل في مقارنة البصمات'}), 500
         
-        # Generate URLs for the images
+        # إنشاء روابط للصور
+        performance_monitor.add_step('إنشاء النتائج')
         marked_fp1_url = url_for('static', filename=f'uploads/processed/{marked_fp1_filename}')
         marked_fp2_url = url_for('static', filename=f'uploads/processed/{marked_fp2_filename}')
         matching_url = url_for('static', filename=f'uploads/processed/{matching_filename}')
+        performance_monitor.update_step('إنشاء النتائج')
+        
+        # إيقاف المراقبة
+        performance_stats = performance_monitor.stop_monitoring()
         
         return jsonify({
             'success': True,
@@ -134,11 +168,13 @@ def upload_files():
             'marked2': marked_fp2_url,
             'matching_visualization': matching_url,
             'num_features1': len(features1),
-            'num_features2': len(features2)
+            'num_features2': len(features2),
+            'performance_stats': performance_stats
         })
         
     except Exception as e:
         logger.error(f'حدث خطأ: {str(e)}')
+        performance_monitor.stop_monitoring()
         return jsonify({'error': str(e)}), 500
 
 # Clean up uploaded files periodically
