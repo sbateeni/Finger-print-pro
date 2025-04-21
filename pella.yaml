@@ -3,14 +3,4 @@ version: 1.0.0
 runtime: python
 python_version: 3.11 # تأكد أن pella.app تدعم هذا الإصدار، أو اختر إصداراً مدعوماً
 build_command: pip install -r requirements.txt
-start_command: gunicorn app:app --bind 0.0.0.0:$PORT # استخدم متغير PORT الذي توفره المنصة
-
-env:
-  - FLASK_ENV=production
-  # FLASK_APP=app.py isn't strictly needed with gunicorn app:app but doesn't hurt
-  - MAX_CONTENT_LENGTH=16777216
-  - UPLOAD_FOLDER=/app/static/uploads # استخدم مسار مطلق داخل حاوية النشر إن أمكن أو المسار النسبي كما في الكود
-  - ALLOWED_EXTENSIONS=png,jpg,jpeg,gif
-  # لا نضع قيمة SECRET_KEY هنا لأسباب أمنية.
-  # يجب تعيين SECRET_KEY في إعدادات متغيرات البيئة لمنصة pella.app
-  # الكود سيقرأه من متغير البيئة أو يستخدم القيمة الافتراضية 'default-secret-key' (وهو غير آمن للإنتاج)
+start_command: web: gunicorn app:app --bind 0.0.0.0:$PORT
