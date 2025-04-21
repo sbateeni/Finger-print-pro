@@ -489,16 +489,16 @@ function updateResults(data) {
     const preview1 = document.getElementById('preview1');
     const preview2 = document.getElementById('preview2');
     
-    if (data.marked1) {
+    if (preview1 && data.marked1) {
         preview1.src = data.marked1;
     }
-    if (data.marked2) {
+    if (preview2 && data.marked2) {
         preview2.src = data.marked2;
     }
 
     // Update matching visualization
     const matchingCanvas = document.getElementById('matching-canvas');
-    if (data.matching_visualization) {
+    if (matchingCanvas && data.matching_visualization) {
         const img = new Image();
         img.src = data.matching_visualization;
         img.onload = () => {
@@ -511,15 +511,17 @@ function updateResults(data) {
 
     // Update matching points info
     const matchingPointsInfo = document.getElementById('matching-points-info');
-    matchingPointsInfo.innerHTML = `
-        <p>عدد النقاط المميزة في البصمة الأولى: <span class="text-primary">${data.features1}</span></p>
-        <p>عدد النقاط المميزة في البصمة الثانية: <span class="text-primary">${data.features2}</span></p>
-        <p>عدد النقاط المتطابقة: <span class="text-success">${data.matching_points}</span></p>
-        <p>نسبة التطابق: <span class="text-info">${data.match_score}%</span></p>
-        <div class="mt-3">
-            <p><span class="text-danger">●</span> النقاط الحمراء: نهايات الخطوط</p>
-            <p><span class="text-success">●</span> النقاط الخضراء: نقاط التفرع</p>
-            <p><span class="text-primary">●</span> الخطوط: تربط بين النقاط المتطابقة</p>
-        </div>
-    `;
+    if (matchingPointsInfo) {
+        matchingPointsInfo.innerHTML = `
+            <p>عدد النقاط المميزة في البصمة الأولى: <span class="text-primary">${data.features1}</span></p>
+            <p>عدد النقاط المميزة في البصمة الثانية: <span class="text-primary">${data.features2}</span></p>
+            <p>عدد النقاط المتطابقة: <span class="text-success">${data.matching_points}</span></p>
+            <p>نسبة التطابق: <span class="text-info">${data.match_score}%</span></p>
+            <div class="mt-3">
+                <p><span class="text-danger">●</span> النقاط الحمراء: نهايات الخطوط</p>
+                <p><span class="text-success">●</span> النقاط الخضراء: نقاط التفرع</p>
+                <p><span class="text-primary">●</span> الخطوط: تربط بين النقاط المتطابقة</p>
+            </div>
+        `;
+    }
 } 

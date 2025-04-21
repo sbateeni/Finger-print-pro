@@ -16,6 +16,7 @@ class PerformanceMonitor:
         self.is_monitoring = False
         self.monitor_thread = None
         self.system_info = self._get_system_info()
+        self.total_steps = 0
         
     def _get_system_info(self):
         """الحصول على معلومات النظام"""
@@ -32,6 +33,7 @@ class PerformanceMonitor:
         self.start_time = time.time()
         self.steps = []
         self.is_monitoring = True
+        self.total_steps = total_steps
         self.monitor_thread = threading.Thread(target=self._monitor_performance)
         self.monitor_thread.daemon = True
         self.monitor_thread.start()

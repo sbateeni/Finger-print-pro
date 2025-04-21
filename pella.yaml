@@ -1,0 +1,13 @@
+name: fingerprint-comparison
+version: 1.0.0
+runtime: python
+python_version: 3.11
+build_command: pip install -r requirements.txt
+start_command: gunicorn app:app
+env:
+  - FLASK_ENV=production
+  - FLASK_APP=app.py
+  - MAX_CONTENT_LENGTH=16777216  # 16MB max file size
+  - UPLOAD_FOLDER=static/uploads
+  - ALLOWED_EXTENSIONS=png,jpg,jpeg,gif
+  - SECRET_KEY=your-secret-key-here 
