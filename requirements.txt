@@ -1,9 +1,9 @@
 Flask==2.0.1
-numpy
+numpy==1.26.4 # تم تحديد الإصدار ليكون أقل من 2.0 للتوافق مع opencv
 opencv-python-headless==4.8.1.78
 scikit-image
 scipy>=1.7.3
 Werkzeug==2.0.1
-gunicorn==20.1.0
+gunicorn==20.1.0 # ضروري لتشغيل تطبيق ويب بايثون على Render
 psutil==5.9.5
-Pillow>=9.0.1 
+Pillow>=9.0.1
