@@ -9,6 +9,8 @@ from fingerprint.visualization import draw_minutiae_points, draw_matching_lines
 from fingerprint.performance_monitor import PerformanceMonitor
 import cv2
 import time
+import shutil
+import numpy as np
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -21,8 +23,10 @@ UPLOAD_FOLDER = os.path.join('static', 'uploads')
 ORIGINAL_FOLDER = os.path.join(UPLOAD_FOLDER, 'original')
 PROCESSED_FOLDER = os.path.join(UPLOAD_FOLDER, 'processed')
 
-# Ensure upload folders exist
+# Ensure upload folders exist and are clean
 for folder in [UPLOAD_FOLDER, ORIGINAL_FOLDER, PROCESSED_FOLDER]:
+    if os.path.exists(folder):
+        shutil.rmtree(folder)
     os.makedirs(folder, exist_ok=True)
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -30,12 +34,39 @@ app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'default-secret-key')
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
+MAX_FILE_SIZE = 16 * 1024 * 1024  # 16MB
 
 # إنشاء كائن مراقب الأداء
 performance_monitor = PerformanceMonitor()
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def validate_image(file):
+    """التحقق من صحة الصورة"""
+    try:
+        # التحقق من نوع الملف
+        if not allowed_file(file.filename):
+            return False, 'نوع الملف غير مدعوم. الأنواع المدعومة هي: PNG, JPG, JPEG, GIF'
+        
+        # التحقق من حجم الملف
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)
+        
+        if file_size > MAX_FILE_SIZE:
+            return False, f'حجم الملف كبير جداً. الحد الأقصى هو {MAX_FILE_SIZE/1024/1024}MB'
+        
+        # التحقق من أن الملف صورة صالحة
+        img_bytes = file.read()
+        file.seek(0)  # إعادة المؤشر إلى بداية الملف
+        img = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_COLOR)
+        if img is None:
+            return False, 'الملف ليس صورة صالحة'
+        
+        return True, None
+    except Exception as e:
+        return False, f'خطأ في التحقق من الصورة: {str(e)}'
 
 @app.route('/')
 def index():
@@ -55,7 +86,7 @@ def upload_files():
     logger.info('بدء عملية رفع الملفات')
     
     # بدء مراقبة الأداء
-    performance_monitor.start_monitoring(total_steps=5)  # 5 خطوات رئيسية
+    performance_monitor.start_monitoring(total_steps=5)
     
     if 'fingerprint1' not in request.files or 'fingerprint2' not in request.files:
         logger.error('لم يتم تحديد الملفات المطلوبة')
@@ -70,10 +101,19 @@ def upload_files():
         performance_monitor.add_step('رفع الملفات', 'failed')
         return jsonify({'error': 'لم يتم اختيار الملفات'}), 400
     
-    if not (allowed_file(fp1.filename) and allowed_file(fp2.filename)):
-        logger.error('نوع الملف غير مدعوم')
+    # التحقق من صحة الصور
+    valid1, error1 = validate_image(fp1)
+    valid2, error2 = validate_image(fp2)
+    
+    if not valid1:
+        logger.error(f'خطأ في الصورة الأولى: {error1}')
         performance_monitor.add_step('رفع الملفات', 'failed')
-        return jsonify({'error': 'نوع الملف غير مدعوم. الأنواع المدعومة هي: PNG, JPG, JPEG, GIF'}), 400
+        return jsonify({'error': error1}), 400
+    
+    if not valid2:
+        logger.error(f'خطأ في الصورة الثانية: {error2}')
+        performance_monitor.add_step('رفع الملفات', 'failed')
+        return jsonify({'error': error2}), 400
     
     try:
         # حفظ الصور الأصلية
@@ -85,8 +125,13 @@ def upload_files():
         fp2_path = os.path.join(ORIGINAL_FOLDER, fp2_filename)
         
         logger.info('حفظ الصور الأصلية')
-        fp1.save(fp1_path)
-        fp2.save(fp2_path)
+        # تحويل الصور إلى numpy arrays وحفظها
+        img1 = cv2.imdecode(np.frombuffer(fp1.read(), np.uint8), cv2.IMREAD_COLOR)
+        img2 = cv2.imdecode(np.frombuffer(fp2.read(), np.uint8), cv2.IMREAD_COLOR)
+        
+        cv2.imwrite(fp1_path, img1)
+        cv2.imwrite(fp2_path, img2)
+        
         logger.info(f'تم حفظ الصور في: {fp1_path} و {fp2_path}')
         performance_monitor.update_step('رفع الملفات')
         
@@ -101,7 +146,7 @@ def upload_files():
         except Exception as e:
             logger.error(f'فشل في معالجة الصور: {str(e)}')
             performance_monitor.update_step('معالجة الصور', 'failed')
-            return jsonify({'error': 'فشل في معالجة الصور'}), 500
+            return jsonify({'error': f'فشل في معالجة الصور: {str(e)}'}), 500
         
         # استخراج المميزات
         performance_monitor.add_step('استخراج المميزات')
@@ -129,7 +174,7 @@ def upload_files():
         except Exception as e:
             logger.error(f'فشل في استخراج المميزات: {str(e)}')
             performance_monitor.update_step('استخراج المميزات', 'failed')
-            return jsonify({'error': 'فشل في استخراج المميزات من الصور'}), 500
+            return jsonify({'error': f'فشل في استخراج المميزات: {str(e)}'}), 500
         
         # مقارنة البصمات
         performance_monitor.add_step('مقارنة البصمات')
@@ -148,7 +193,7 @@ def upload_files():
         except Exception as e:
             logger.error(f'فشل في مقارنة البصمات: {str(e)}')
             performance_monitor.update_step('مقارنة البصمات', 'failed')
-            return jsonify({'error': 'فشل في مقارنة البصمات'}), 500
+            return jsonify({'error': f'فشل في مقارنة البصمات: {str(e)}'}), 500
         
         # إنشاء روابط للصور
         performance_monitor.add_step('إنشاء النتائج')
@@ -177,20 +222,20 @@ def upload_files():
         performance_monitor.stop_monitoring()
         return jsonify({'error': str(e)}), 500
 
-# Clean up uploaded files periodically
 def cleanup_old_files():
-    """
-    تنظيف الملفات القديمة من مجلدات التحميل
-    """
+    """تنظيف الملفات القديمة من مجلدات التحميل"""
     try:
         for folder in [ORIGINAL_FOLDER, PROCESSED_FOLDER]:
-            for filename in os.listdir(folder):
-                file_path = os.path.join(folder, filename)
-                # حذف الملفات الأقدم من ساعة
-                if os.path.getmtime(file_path) < time.time() - 3600:
-                    os.remove(file_path)
+            if os.path.exists(folder):
+                for filename in os.listdir(folder):
+                    file_path = os.path.join(folder, filename)
+                    if os.path.getmtime(file_path) < time.time() - 3600:
+                        os.remove(file_path)
     except Exception as e:
         logger.error(f'فشل في تنظيف الملفات القديمة: {str(e)}')
+
+# تنظيف الملفات المؤقتة عند بدء التشغيل
+cleanup_old_files()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

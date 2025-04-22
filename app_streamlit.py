@@ -155,9 +155,13 @@ if compare_button and fingerprint1 and fingerprint2:
         # عرض النقاط المتطابقة
         st.markdown("### 📍 النقاط المتطابقة")
         for i, match in enumerate(matching_points):
-            point1 = match['point1']
-            point2 = match['point2']
-            st.write(f"نقطة تطابق {i+1}: ({point1['x']}, {point1['y']}) ↔ ({point2['x']}, {point2['y']})")
+            if isinstance(match, tuple) and len(match) == 2:
+                point1, point2 = match
+                st.write(f"نقطة تطابق {i+1}: ({point1.x}, {point1.y}) ↔ ({point2.x}, {point2.y})")
+            elif isinstance(match, dict):
+                point1 = match.get('point1', {})
+                point2 = match.get('point2', {})
+                st.write(f"نقطة تطابق {i+1}: ({point1.get('x', 'N/A')}, {point1.get('y', 'N/A')}) ↔ ({point2.get('x', 'N/A')}, {point2.get('y', 'N/A')})")
         
         # تنظيف الملفات المؤقتة
         os.remove(img1_path)
