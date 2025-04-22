@@ -67,9 +67,9 @@ compare_button = st.button("🔍 مقارنة البصمات", type="primary")
 if fingerprint1 and fingerprint2:
     col1, col2 = st.columns(2)
     with col1:
-        st.image(fingerprint1, caption="البصمة الأولى", use_column_width=True)
+        st.image(fingerprint1, caption="البصمة الأولى", use_container_width=True)
     with col2:
-        st.image(fingerprint2, caption="البصمة الثانية", use_column_width=True)
+        st.image(fingerprint2, caption="البصمة الثانية", use_container_width=True)
 
 # معالجة المقارنة
 if compare_button and fingerprint1 and fingerprint2:
@@ -130,13 +130,13 @@ if compare_button and fingerprint1 and fingerprint2:
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.image(marked_fp1, caption="البصمة الأولى مع النقاط المميزة", use_column_width=True)
+            st.image(marked_fp1, caption="البصمة الأولى مع النقاط المميزة", use_container_width=True)
         
         with col2:
-            st.image(marked_fp2, caption="البصمة الثانية مع النقاط المميزة", use_column_width=True)
+            st.image(marked_fp2, caption="البصمة الثانية مع النقاط المميزة", use_container_width=True)
         
         with col3:
-            st.image(matching_visualization, caption="خطوط التطابق", use_column_width=True)
+            st.image(matching_visualization, caption="خطوط التطابق", use_container_width=True)
         
         # عرض إحصائيات المقارنة
         st.markdown("### 📊 نتائج المقارنة")
