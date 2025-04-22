@@ -155,19 +155,30 @@ document.addEventListener('DOMContentLoaded', function() {
         processingStatus.scrollTop = processingStatus.scrollHeight;
     }
 
-    // Handle comparison
+    // إضافة دالة لتحديث تفاصيل المراحل
+    function updateProcessingDetails(message, type = 'info') {
+        const stageLogs = document.querySelector('.stage-logs');
+        const logEntry = document.createElement('div');
+        logEntry.className = `stage-log ${type}`;
+        logEntry.textContent = message;
+        stageLogs.appendChild(logEntry);
+        stageLogs.scrollTop = stageLogs.scrollHeight;
+    }
+
+    // تعديل دالة معالجة المقارنة
     compareBtn.addEventListener('click', async function() {
         const formData = new FormData();
         formData.append('fingerprint1', fileInputs[0].files[0]);
         formData.append('fingerprint2', fileInputs[1].files[0]);
 
-        // Show loading state
+        // تهيئة الواجهة
         compareBtn.classList.add('loading');
         compareBtn.disabled = true;
         errorMessage.style.display = 'none';
+        document.querySelector('.stage-logs').innerHTML = '';
         resultsDiv.style.display = 'none';
-        processingStatus.innerHTML = '';
-        updateStatus('بدء عملية المقارنة...');
+
+        updateProcessingDetails('بدء عملية المقارنة...', 'info');
 
         try {
             const response = await fetch('/upload', {
@@ -178,81 +189,63 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
 
             if (response.ok && data.success) {
-                // Update results
-                const score = Math.round(data.match_score * 100);
-                progressBar.style.width = `${score}%`;
-                matchScore.textContent = `${score}%`;
+                // تحديث تفاصيل المراحل
+                updateProcessingDetails(`تم تحميل الملفات بنجاح`, 'success');
+                updateProcessingDetails(`معالجة الصور...`, 'info');
+                updateProcessingDetails(`تم استخراج ${data.num_features1} نقطة مميزة من البصمة الأولى`, 'success');
+                updateProcessingDetails(`تم استخراج ${data.num_features2} نقطة مميزة من البصمة الثانية`, 'success');
+                updateProcessingDetails(`تم العثور على ${data.matching_points.length} نقاط متطابقة`, 'success');
                 
-                // Show results div
+                // إظهار وتحديث النتائج
                 resultsDiv.style.display = 'block';
+                resultsDiv.classList.add('show');
                 
-                // Update preview images with processed versions
-                if (data.marked1) previewImages[0].src = data.marked1;
-                if (data.marked2) previewImages[1].src = data.marked2;
+                // تحديث نسبة التطابق
+                const score = Math.round(data.match_score * 100);
+                const progressBar = resultsDiv.querySelector('.progress-bar');
+                progressBar.style.width = `${score}%`;
+                document.getElementById('match-score').textContent = `${score}%`;
+                document.getElementById('matching-points-count').textContent = data.matching_points.length;
+                
+                // تحديث الصور المعالجة
+                if (data.marked1) {
+                    previewImages[0].src = data.marked1;
+                }
+                if (data.marked2) {
+                    previewImages[1].src = data.marked2;
+                }
 
                 // عرض صورة خطوط التطابق
-                if (data.matching_visualization) {
-                    const matchingVisualization = document.getElementById('matching-visualization');
-                    if (matchingVisualization) {
-                        const img = document.createElement('img');
-                        img.src = data.matching_visualization;
-                        img.style.width = '100%';
-                        img.style.height = 'auto';
-                        img.alt = 'خطوط التطابق بين البصمتين';
-                        
-                        // إزالة أي صور سابقة
-                        matchingVisualization.innerHTML = '';
-                        matchingVisualization.appendChild(img);
-                    }
+                const matchingImage = document.getElementById('matching-image');
+                if (data.matching_visualization && matchingImage) {
+                    matchingImage.src = data.matching_visualization;
+                    matchingImage.style.display = 'block';
                 }
 
                 // تحديث معلومات النقاط المميزة
-                matchingPoints.innerHTML = `
-                    <div class="feature-info">
-                        <p>عدد النقاط المميزة في البصمة الأولى: ${data.num_features1}</p>
-                        <p>عدد النقاط المميزة في البصمة الثانية: ${data.num_features2}</p>
-                        <p>عدد النقاط المتطابقة: ${data.matching_points.length}</p>
-                        <p class="match-details">النقاط الحمراء: نقاط النهاية</p>
-                        <p class="match-details">النقاط الخضراء: نقاط التفرع</p>
-                        <p class="match-details">الخطوط الملونة: مناطق التطابق</p>
-                    </div>
-                `;
-                
-                // Wait for images to load before drawing
-                Promise.all([
-                    new Promise(resolve => previewImages[0].onload = resolve),
-                    new Promise(resolve => previewImages[1].onload = resolve)
-                ]).then(() => {
-                    // Draw matching points
-                    if (data.matching_points && data.matching_points.length > 0) {
-                        drawMatchingPoints(data.matching_points, previewImages[0], previewImages[1]);
-                    }
-                });
-                
-                // Update status with feature information
-                updateStatus(`تم استخراج ${data.num_features1} نقطة مميزة من البصمة الأولى`);
-                updateStatus(`تم استخراج ${data.num_features2} نقطة مميزة من البصمة الثانية`);
-                
-                // Display matching points
-                matchingPoints.innerHTML = '';
-                if (data.matching_points && data.matching_points.length > 0) {
-                    updateStatus(`تم العثور على ${data.matching_points.length} نقاط متطابقة`);
-                    const pointsList = document.createElement('ul');
-                    data.matching_points.forEach((pair, index) => {
-                        const li = document.createElement('li');
-                        li.textContent = `نقطة تطابق ${index + 1}: (${pair[0].x}, ${pair[0].y}) ↔ (${pair[1].x}, ${pair[1].y})`;
-                        pointsList.appendChild(li);
-                    });
-                    matchingPoints.appendChild(pointsList);
+                const matchingPointsDiv = document.getElementById('matching-points');
+                if (matchingPointsDiv) {
+                    matchingPointsDiv.innerHTML = `
+                        <div class="feature-info">
+                            <p>عدد النقاط المميزة في البصمة الأولى: ${data.num_features1}</p>
+                            <p>عدد النقاط المميزة في البصمة الثانية: ${data.num_features2}</p>
+                            <p>عدد النقاط المتطابقة: ${data.matching_points.length}</p>
+                            <div class="match-details mt-3">
+                                <p><span class="text-danger">●</span> نقاط النهاية</p>
+                                <p><span class="text-success">●</span> نقاط التفرع</p>
+                                <p><span class="text-primary">●</span> خطوط التطابق</p>
+                            </div>
+                        </div>
+                    `;
                 }
 
-                updateStatus(`نسبة التطابق النهائية: ${score}%`);
+                updateProcessingDetails(`اكتملت المقارنة بنجاح - نسبة التطابق: ${score}%`, 'success');
             } else {
                 throw new Error(data.error || 'فشلت عملية المقارنة');
             }
         } catch (error) {
+            updateProcessingDetails(`حدث خطأ: ${error.message}`, 'error');
             showError(error.message);
-            updateStatus(`حدث خطأ: ${error.message}`);
         } finally {
             compareBtn.classList.remove('loading');
             compareBtn.disabled = false;
@@ -485,43 +478,49 @@ document.getElementById('compare-btn').addEventListener('click', async () => {
 });
 
 function updateResults(data) {
-    // Update preview images
-    const preview1 = document.getElementById('preview1');
-    const preview2 = document.getElementById('preview2');
+    // تحديث نسبة التطابق
+    const matchScore = document.getElementById('match-score');
+    const progressBar = document.querySelector('.progress-bar');
+    const score = Math.round(data.match_score * 100);
     
-    if (preview1 && data.marked1) {
-        preview1.src = data.marked1;
-    }
-    if (preview2 && data.marked2) {
-        preview2.src = data.marked2;
-    }
+    matchScore.textContent = `${score}%`;
+    progressBar.style.width = `${score}%`;
+    
+    // إضافة تأثير التحديث
+    matchScore.classList.add('updated');
+    progressBar.classList.add('updated');
+    setTimeout(() => {
+        matchScore.classList.remove('updated');
+        progressBar.classList.remove('updated');
+    }, 500);
 
-    // Update matching visualization
-    const matchingCanvas = document.getElementById('matching-canvas');
-    if (matchingCanvas && data.matching_visualization) {
-        const img = new Image();
-        img.src = data.matching_visualization;
-        img.onload = () => {
-            const ctx = matchingCanvas.getContext('2d');
-            matchingCanvas.width = img.width;
-            matchingCanvas.height = img.height;
-            ctx.drawImage(img, 0, 0);
-        };
-    }
+    // تحديث عدد النقاط المتطابقة
+    const pointsCount = document.getElementById('matching-points-count');
+    pointsCount.textContent = data.matching_points.length;
+    pointsCount.classList.add('updated');
+    setTimeout(() => pointsCount.classList.remove('updated'), 500);
 
-    // Update matching points info
-    const matchingPointsInfo = document.getElementById('matching-points-info');
-    if (matchingPointsInfo) {
-        matchingPointsInfo.innerHTML = `
-            <p>عدد النقاط المميزة في البصمة الأولى: <span class="text-primary">${data.features1}</span></p>
-            <p>عدد النقاط المميزة في البصمة الثانية: <span class="text-primary">${data.features2}</span></p>
-            <p>عدد النقاط المتطابقة: <span class="text-success">${data.matching_points}</span></p>
-            <p>نسبة التطابق: <span class="text-info">${data.match_score}%</span></p>
-            <div class="mt-3">
-                <p><span class="text-danger">●</span> النقاط الحمراء: نهايات الخطوط</p>
-                <p><span class="text-success">●</span> النقاط الخضراء: نقاط التفرع</p>
-                <p><span class="text-primary">●</span> الخطوط: تربط بين النقاط المتطابقة</p>
-            </div>
+    // تحديث صورة المقارنة
+    const matchingImage = document.getElementById('matching-image');
+    matchingImage.src = data.matching_visualization;
+    matchingImage.style.display = 'block';
+    matchingImage.classList.add('updated');
+    setTimeout(() => matchingImage.classList.remove('updated'), 500);
+
+    // تحديث قائمة النقاط المتطابقة
+    const matchingPointsContainer = document.getElementById('matching-points');
+    matchingPointsContainer.innerHTML = '';
+    
+    data.matching_points.forEach((point, index) => {
+        const pointElement = document.createElement('div');
+        pointElement.className = 'matching-point';
+        pointElement.innerHTML = `
+            <i class="fas fa-circle text-primary me-2"></i>
+            <span>نقطة تطابق ${index + 1}: (${point.x1}, ${point.y1}) ↔ (${point.x2}, ${point.y2})</span>
         `;
-    }
+        matchingPointsContainer.appendChild(pointElement);
+    });
+    
+    matchingPointsContainer.classList.add('updated');
+    setTimeout(() => matchingPointsContainer.classList.remove('updated'), 500);
 } 

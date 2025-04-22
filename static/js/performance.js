@@ -236,4 +236,68 @@ window.performanceMonitor = {
     update: updatePerformance,
     showError: showError,
     hideError: hideError
-}; 
+};
+
+// دالة للتحكم في استهلاك المعالج
+function checkCPUUsage(cpuUsage) {
+    const cpuUsageElement = document.getElementById('cpu-usage');
+    const warningElement = document.getElementById('cpu-warning');
+    
+    // تحديث قيمة استخدام المعالج
+    cpuUsageElement.textContent = `${cpuUsage}%`;
+    
+    // التحقق من تجاوز الحد المسموح به
+    if (cpuUsage > 70) {
+        // إضافة تنبيه
+        if (!warningElement) {
+            const warningDiv = document.createElement('div');
+            warningDiv.id = 'cpu-warning';
+            warningDiv.className = 'alert alert-warning mt-2';
+            warningDiv.textContent = 'تحذير: استخدام المعالج مرتفع! سيتم تخفيض سرعة المعالجة تلقائياً.';
+            cpuUsageElement.parentNode.appendChild(warningDiv);
+        }
+        
+        // تخفيض سرعة المعالجة
+        return true;
+    } else {
+        // إزالة التنبيه إذا كان موجوداً
+        if (warningElement) {
+            warningElement.remove();
+        }
+        return false;
+    }
+}
+
+// تعديل دالة updatePerformanceInfo
+function updatePerformanceInfo() {
+    fetch('/status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                console.error('Error fetching performance data:', data.error);
+                return;
+            }
+
+            // التحقق من استخدام المعالج
+            const shouldSlowDown = checkCPUUsage(data.cpu_usage);
+            
+            // تحديث قيم الأداء
+            document.getElementById('memory-usage').textContent = `${data.memory_usage}%`;
+            document.getElementById('elapsed-time').textContent = `${data.elapsed_time}s`;
+            document.getElementById('steps-count').textContent = data.steps_count;
+            
+            // إذا كان استخدام المعالج مرتفعاً، قم بتخفيض سرعة التحديث
+            const updateInterval = shouldSlowDown ? 4000 : 2000;
+            clearInterval(window.performanceInterval);
+            window.performanceInterval = setInterval(updatePerformanceInfo, updateInterval);
+        })
+        .catch(error => {
+            console.error('Error fetching performance data:', error);
+        });
+}
+
+// تهيئة متغير التحديث
+window.performanceInterval = setInterval(updatePerformanceInfo, 2000);
+
+// تحديث المعلومات عند تحميل الصفحة
+document.addEventListener('DOMContentLoaded', updatePerformanceInfo); 
