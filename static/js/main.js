@@ -1,373 +1,421 @@
+// متغيرات عامة
+let currentStep = 0;
+let isProcessing = false;
+let performanceMonitor = null;
+
+// تهيئة التطبيق
 document.addEventListener('DOMContentLoaded', function() {
-    const uploadAreas = document.querySelectorAll('.upload-area');
-    const fileInputs = document.querySelectorAll('.file-input');
-    const previewImages = document.querySelectorAll('.preview-area img');
-    const uploadTexts = document.querySelectorAll('.upload-text');
-    const compareBtn = document.getElementById('compare-btn');
-    const resultsDiv = document.getElementById('results');
-    const errorMessage = document.getElementById('error-message');
-    const progressBar = document.querySelector('.progress-bar');
-    const matchScore = document.getElementById('match-score');
-    const matchingPoints = document.getElementById('matching-points');
-    const processingStatus = document.getElementById('processing-status');
-    const canvas = document.getElementById('matching-canvas');
-    let ctx = null;
-
-    // Initialize canvas if it exists
-    if (canvas) {
-        ctx = canvas.getContext('2d');
-        // Set canvas size
-        function resizeCanvas() {
-            const container = canvas.parentElement;
-            canvas.width = container.offsetWidth;
-            canvas.height = container.offsetHeight;
-        }
-        
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-    }
-
-    // Handle file selection
-    fileInputs.forEach((input, index) => {
-        input.addEventListener('change', function(e) {
-            handleFileSelect(e.target.files[0], index);
-        });
-    });
-
-    // Handle file selection
-    function handleFileSelect(file, index) {
-        if (file && file.type.startsWith('image/')) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                previewImages[index].src = e.target.result;
-                previewImages[index].style.display = 'block';
-                uploadTexts[index].style.display = 'none';
-                uploadAreas[index].classList.add('has-image');
-            };
-            reader.readAsDataURL(file);
-            updateCompareButton();
-        } else if (file) {
-            showError('الرجاء اختيار ملف صورة صالح');
-        }
-    }
-
-    // Handle drag and drop
-    uploadAreas.forEach((area, index) => {
-        area.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            area.classList.add('dragover');
-        });
-
-        area.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            area.classList.remove('dragover');
-        });
-
-        area.addEventListener('drop', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            area.classList.remove('dragover');
-            
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
-                handleFileSelect(file, index);
-            } else {
-                showError('الرجاء إسقاط ملف صورة صالح');
-            }
-        });
-
-        // Handle click to upload
-        area.addEventListener('click', function() {
-            fileInputs[index].click();
-        });
-    });
-
-    // Update compare button state
-    function updateCompareButton() {
-        const bothFilesSelected = Array.from(fileInputs).every(input => input.files.length > 0);
-        if (compareBtn) {
-            compareBtn.disabled = !bothFilesSelected;
-        }
-    }
-
-    // Show error message
-    function showError(message) {
-        if (errorMessage) {
-            errorMessage.textContent = message;
-            errorMessage.style.display = 'block';
-            setTimeout(() => {
-                errorMessage.style.display = 'none';
-            }, 3000);
-        }
-    }
-
-    // Handle compare button click
-    if (compareBtn) {
-        compareBtn.addEventListener('click', async function() {
-            const formData = new FormData();
-            formData.append('fingerprint1', fileInputs[0].files[0]);
-            formData.append('fingerprint2', fileInputs[1].files[0]);
-
-            compareBtn.disabled = true;
-            compareBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>جاري المعالجة...';
-            if (errorMessage) errorMessage.style.display = 'none';
-            if (resultsDiv) resultsDiv.style.display = 'none';
-
-            try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.success) {
-                    // إظهار وتحديث النتائج
-                    if (resultsDiv) {
-                        resultsDiv.style.display = 'block';
-                        resultsDiv.classList.add('show');
-                    }
-                    
-                    // تحديث نسبة التطابق
-                    const score = Math.round(data.match_score * 100);
-                    if (progressBar) progressBar.style.width = `${score}%`;
-                    if (matchScore) matchScore.textContent = `${score}%`;
-                    
-                    const pointsCount = document.getElementById('matching-points-count');
-                    if (pointsCount) pointsCount.textContent = data.matching_points.length;
-                    
-                    // تحديث الصور المعالجة
-                    if (data.marked1 && previewImages[0]) {
-                        previewImages[0].src = data.marked1;
-                    }
-                    if (data.marked2 && previewImages[1]) {
-                        previewImages[1].src = data.marked2;
-                    }
-
-                    // عرض صورة خطوط التطابق
-                    const matchingImage = document.getElementById('matching-image');
-                    if (data.matching_visualization && matchingImage) {
-                        matchingImage.src = data.matching_visualization;
-                        matchingImage.style.display = 'block';
-                    }
-
-                    // تحديث معلومات النقاط المميزة
-                    if (matchingPoints) {
-                        matchingPoints.innerHTML = `
-                            <div class="feature-info">
-                                <p>عدد النقاط المميزة في البصمة الأولى: ${data.num_features1}</p>
-                                <p>عدد النقاط المميزة في البصمة الثانية: ${data.num_features2}</p>
-                                <p>عدد النقاط المتطابقة: ${data.matching_points.length}</p>
-                                <div class="match-details mt-3">
-                                    <p><span class="text-danger">●</span> نقاط النهاية</p>
-                                    <p><span class="text-success">●</span> نقاط التفرع</p>
-                                    <p><span class="text-primary">●</span> خطوط التطابق</p>
-                                </div>
-                            </div>
-                        `;
-                    }
-                } else {
-                    throw new Error(data.error || 'فشلت عملية المقارنة');
-                }
-            } catch (error) {
-                showError(error.message);
-            } finally {
-                if (compareBtn) {
-                    compareBtn.disabled = false;
-                    compareBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>مقارنة البصمات';
-                }
-            }
-        });
-    }
+    initializeUploadForm();
+    initializePerformanceMonitor();
+    setupEventListeners();
 });
 
-// Performance Monitoring Class
-class PerformanceMonitor {
-    constructor() {
-        this.startTime = null;
-        this.steps = document.querySelectorAll('.step');
-        this.progressBar = document.querySelector('.progress-bar');
-        this.processingTime = document.getElementById('processing-time');
-        this.memoryUsage = document.getElementById('memory-usage');
-        this.errorMessage = document.getElementById('error-message');
-        
-        // Start monitoring system info
-        this.startMonitoring();
-    }
-
-    startMonitoring() {
-        setInterval(() => this.updateSystemInfo(), 1000);
-    }
-
-    start() {
-        this.startTime = Date.now();
-        this.resetSteps();
-        this.updateProgress(0);
-        this.hideError();
-    }
-
-    updateProgress(percent) {
-        this.progressBar.style.width = `${percent}%`;
-    }
-
-    updateStep(stepIndex, status) {
-        const step = this.steps[stepIndex];
-        if (!step) return;
-
-        // Remove all status classes
-        step.classList.remove('completed', 'in-progress', 'failed');
-        
-        // Update status icon and add appropriate class
-        const statusIcon = step.querySelector('.step-status');
-        switch (status) {
-            case 'completed':
-                statusIcon.textContent = '✅';
-                step.classList.add('completed');
-                break;
-            case 'in-progress':
-                statusIcon.textContent = '⏳';
-                step.classList.add('in-progress');
-                break;
-            case 'failed':
-                statusIcon.textContent = '❌';
-                step.classList.add('failed');
-                break;
-            default:
-                statusIcon.textContent = '⭕';
-        }
-    }
-
-    showError(message) {
-        this.errorMessage.textContent = message;
-        this.errorMessage.style.display = 'block';
-    }
-
-    hideError() {
-        this.errorMessage.style.display = 'none';
-    }
-
-    resetSteps() {
-        this.steps.forEach(step => {
-            step.classList.remove('completed', 'in-progress', 'failed');
-            const statusIcon = step.querySelector('.step-status');
-            statusIcon.textContent = '⭕';
-        });
-    }
-
-    updateSystemInfo() {
-        if (this.startTime) {
-            const elapsedTime = ((Date.now() - this.startTime) / 1000).toFixed(1);
-            this.processingTime.textContent = elapsedTime;
-        }
-
-        // Get memory usage if available
-        if (window.performance && window.performance.memory) {
-            const memoryMB = (window.performance.memory.usedJSHeapSize / (1024 * 1024)).toFixed(1);
-            this.memoryUsage.textContent = memoryMB;
-        }
-    }
-}
-
-// Initialize performance monitor
-const performanceMonitor = new PerformanceMonitor();
-
-// Update the file upload handling
-document.getElementById('compare-btn').addEventListener('click', async () => {
-    const file1 = document.getElementById('fingerprint1').files[0];
-    const file2 = document.getElementById('fingerprint2').files[0];
-
-    if (!file1 || !file2) {
-        performanceMonitor.showError('الرجاء اختيار ملفين للبصمات');
+// تهيئة نموذج الرفع
+function initializeUploadForm() {
+    const uploadForm = document.getElementById('upload-form');
+    const fileInput1 = document.getElementById('fingerprint1');
+    const fileInput2 = document.getElementById('fingerprint2');
+    const uploadButton = document.getElementById('upload-button');
+    
+    if (!uploadForm || !fileInput1 || !fileInput2 || !uploadButton) {
+        console.error('عناصر الرفع غير موجودة');
         return;
     }
 
-    const formData = new FormData();
-    formData.append('fingerprint1', file1);
-    formData.append('fingerprint2', file2);
+    // معالجة اختيار الملفات
+    fileInput1.addEventListener('change', handleFileSelect);
+    fileInput2.addEventListener('change', handleFileSelect);
+    
+    // معالجة إرسال النموذج
+    uploadForm.addEventListener('submit', handleFormSubmit);
+}
+
+// تهيئة مراقب الأداء
+function initializePerformanceMonitor() {
+    performanceMonitor = {
+        startMonitoring: function() {
+            console.log('بدء مراقبة الأداء');
+        },
+        stopMonitoring: function() {
+            console.log('إيقاف مراقبة الأداء');
+            return {
+                totalTime: 0,
+                memoryUsage: 0,
+                cpuUsage: 0
+            };
+        },
+        addStep: function(step, status) {
+            console.log(`إضافة خطوة: ${step}, الحالة: ${status}`);
+        },
+        updateStep: function(step, status) {
+            console.log(`تحديث خطوة: ${step}, الحالة: ${status}`);
+        }
+    };
+}
+
+// إعداد مستمعي الأحداث
+function setupEventListeners() {
+    // تحديث حالة المعالجة
+    setInterval(updateProcessingStatus, 1000);
+    
+    // تحديث استخدام الموارد
+    setInterval(updateResourceUsage, 2000);
+}
+
+// معالجة اختيار الملف
+function handleFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // التحقق من نوع الملف
+    if (!isValidFileType(file)) {
+        showAlert('نوع الملف غير مدعوم. يرجى اختيار صورة بصمة أصبع صالحة.', 'error');
+        event.target.value = '';
+        return;
+    }
+
+    // التحقق من حجم الملف
+    if (file.size > 16 * 1024 * 1024) { // 16MB
+        showAlert('حجم الملف كبير جداً. الحد الأقصى هو 16MB.', 'error');
+        event.target.value = '';
+        return;
+    }
+
+    // عرض معاينة الصورة
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const previewId = event.target.id === 'fingerprint1' ? 'preview1' : 'preview2';
+        const preview = document.getElementById(previewId);
+        if (preview) {
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+        }
+    };
+    reader.readAsDataURL(file);
+}
+
+// معالجة إرسال النموذج
+async function handleFormSubmit(event) {
+    event.preventDefault();
+    
+    if (isProcessing) {
+        showAlert('جاري معالجة طلب سابق...', 'warning');
+        return;
+    }
+
+    const formData = new FormData(event.target);
+    const fingerprint1 = formData.get('fingerprint1');
+    const fingerprint2 = formData.get('fingerprint2');
+
+    if (!fingerprint1 || !fingerprint2) {
+        showAlert('يرجى اختيار صورتين للبصمات', 'error');
+        return;
+    }
 
     try {
-        performanceMonitor.start();
-        performanceMonitor.updateStep(0, 'in-progress');
-        performanceMonitor.updateProgress(25);
-
+        isProcessing = true;
+        updateProcessingStatus('جاري معالجة الصور...');
+        
+        // بدء مراقبة الأداء
+        performanceMonitor.startMonitoring();
+        
+        // إرسال الطلب
         const response = await fetch('/upload', {
             method: 'POST',
             body: formData
         });
 
         if (!response.ok) {
-            throw new Error('فشل في معالجة الطلب');
+            throw new Error('فشل في معالجة الصور');
         }
 
-        performanceMonitor.updateStep(0, 'completed');
-        performanceMonitor.updateStep(1, 'in-progress');
-        performanceMonitor.updateProgress(50);
-
-        const data = await response.json();
+        const result = await response.json();
         
-        performanceMonitor.updateStep(1, 'completed');
-        performanceMonitor.updateStep(2, 'in-progress');
-        performanceMonitor.updateProgress(75);
+        if (result.error) {
+            throw new Error(result.error);
+        }
 
-        // Update UI with results
-        updateResults(data);
-
-        performanceMonitor.updateStep(2, 'completed');
-        performanceMonitor.updateStep(3, 'completed');
-        performanceMonitor.updateProgress(100);
-
+        // عرض النتائج
+        displayResults(result);
+        
     } catch (error) {
-        performanceMonitor.showError(error.message);
-        performanceMonitor.updateStep(3, 'failed');
+        showAlert(error.message, 'error');
+    } finally {
+        isProcessing = false;
+        performanceMonitor.stopMonitoring();
+        updateProcessingStatus('');
     }
-});
+}
 
-function updateResults(data) {
-    // تحديث نسبة التطابق
-    const matchScore = document.getElementById('match-score');
-    const progressBar = document.querySelector('.progress-bar');
-    const score = Math.round(data.match_score * 100);
+// تحديث حالة المعالجة
+function updateProcessingStatus(message = '') {
+    const statusElement = document.getElementById('processing-status');
+    if (statusElement) {
+        statusElement.textContent = message;
+        statusElement.style.display = message ? 'block' : 'none';
+    }
+}
+
+// تحديث استخدام الموارد
+function updateResourceUsage() {
+    if (!isProcessing) return;
+
+    const memoryElement = document.getElementById('memory-usage');
+    const cpuElement = document.getElementById('cpu-usage');
     
-    matchScore.textContent = `${score}%`;
-    progressBar.style.width = `${score}%`;
+    if (memoryElement && cpuElement) {
+        // هذه قيم وهمية للتوضيح
+        memoryElement.textContent = 'الذاكرة: ' + Math.random().toFixed(2) + ' MB';
+        cpuElement.textContent = 'المعالج: ' + Math.random().toFixed(2) + ' %';
+    }
+}
+
+// عرض النتائج
+function displayResults(result) {
+    const resultsSection = document.getElementById('results-section');
+    if (!resultsSection) return;
+
+    // عرض درجة التطابق
+    const matchScoreElement = document.getElementById('match-score');
+    if (matchScoreElement) {
+        matchScoreElement.textContent = (result.match_score * 100).toFixed(2) + '%';
+    }
+
+    // عرض عدد النقاط المتطابقة
+    const matchingPointsElement = document.getElementById('matching-points');
+    if (matchingPointsElement) {
+        matchingPointsElement.textContent = result.matching_points.length;
+    }
+
+    // عرض الصور المعالجة
+    updateImagePreview('processed1', result.processed_image1);
+    updateImagePreview('processed2', result.processed_image2);
+    updateImagePreview('matching', result.matching_visualization);
+
+    // عرض إحصائيات الأداء
+    displayPerformanceStats(result.performance_stats);
+
+    // إظهار قسم النتائج
+    resultsSection.style.display = 'block';
+}
+
+// تحديث معاينة الصورة
+function updateImagePreview(elementId, imageUrl) {
+    const preview = document.getElementById(elementId);
+    if (preview) {
+        preview.src = imageUrl;
+        preview.style.display = 'block';
+    }
+}
+
+// عرض إحصائيات الأداء
+function displayPerformanceStats(stats) {
+    const statsElement = document.getElementById('performance-stats');
+    if (!statsElement) return;
+
+    statsElement.innerHTML = `
+        <p>الوقت الإجمالي: ${stats.totalTime.toFixed(2)} ثانية</p>
+        <p>استخدام الذاكرة: ${formatBytes(stats.memoryUsage)}</p>
+        <p>استخدام المعالج: ${stats.cpuUsage.toFixed(2)}%</p>
+    `;
+}
+
+// عرض تنبيه
+function showAlert(message, type = 'info') {
+    const alertElement = document.createElement('div');
+    alertElement.className = `alert alert-${type}`;
+    alertElement.textContent = message;
     
-    // إضافة تأثير التحديث
-    matchScore.classList.add('updated');
-    progressBar.classList.add('updated');
-    setTimeout(() => {
-        matchScore.classList.remove('updated');
-        progressBar.classList.remove('updated');
-    }, 500);
+    const container = document.querySelector('.container');
+    if (container) {
+        container.insertBefore(alertElement, container.firstChild);
+        
+        // إزالة التنبيه بعد 5 ثواني
+        setTimeout(() => {
+            alertElement.remove();
+        }, 5000);
+    }
+}
 
-    // تحديث عدد النقاط المتطابقة
-    const pointsCount = document.getElementById('matching-points-count');
-    pointsCount.textContent = data.matching_points.length;
-    pointsCount.classList.add('updated');
-    setTimeout(() => pointsCount.classList.remove('updated'), 500);
+// التحقق من نوع الملف
+function isValidFileType(file) {
+    const validTypes = ['image/jpeg', 'image/png', 'image/gif'];
+    return validTypes.includes(file.type);
+}
 
-    // تحديث صورة المقارنة
-    const matchingImage = document.getElementById('matching-image');
-    matchingImage.src = data.matching_visualization;
-    matchingImage.style.display = 'block';
-    matchingImage.classList.add('updated');
-    setTimeout(() => matchingImage.classList.remove('updated'), 500);
+// تنسيق حجم الملف
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
 
-    // تحديث قائمة النقاط المتطابقة
-    const matchingPointsContainer = document.getElementById('matching-points');
-    matchingPointsContainer.innerHTML = '';
-    
-    data.matching_points.forEach((point, index) => {
-        const pointElement = document.createElement('div');
-        pointElement.className = 'matching-point';
-        pointElement.innerHTML = `
-            <i class="fas fa-circle text-primary me-2"></i>
-            <span>نقطة تطابق ${index + 1}: (${point.x1}, ${point.y1}) ↔ (${point.x2}, ${point.y2})</span>
-        `;
-        matchingPointsContainer.appendChild(pointElement);
+document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('upload-form');
+    const uploadButton = document.getElementById('upload-button');
+    const processingStatus = document.getElementById('processing-status');
+    const resultsSection = document.getElementById('results-section');
+    const preview1 = document.getElementById('preview1');
+    const preview2 = document.getElementById('preview2');
+
+    // معاينة الصور قبل الرفع
+    function previewImage(input, preview) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    document.getElementById('fingerprint1').addEventListener('change', function() {
+        previewImage(this, preview1);
     });
+
+    document.getElementById('fingerprint2').addEventListener('change', function() {
+        previewImage(this, preview2);
+    });
+
+    // تحديث حالة المعالجة
+    async function updateProcessingStatus() {
+        try {
+            const response = await fetch('/status');
+            const data = await response.json();
+            
+            if (data.error) {
+                return;
+            }
+
+            let statusHTML = '<h4>حالة المعالجة:</h4>';
+            statusHTML += '<div class="progress mb-3">';
+            statusHTML += `<div class="progress-bar" role="progressbar" style="width: ${data.progress}%" aria-valuenow="${data.progress}" aria-valuemin="0" aria-valuemax="100">${data.progress}%</div>`;
+            statusHTML += '</div>';
+            
+            if (data.current_step) {
+                statusHTML += `<p>الخطوة الحالية: ${data.current_step}</p>`;
+            }
+
+            processingStatus.innerHTML = statusHTML;
+
+            if (data.progress < 100) {
+                setTimeout(updateProcessingStatus, 1000);
+            }
+        } catch (error) {
+            console.error('خطأ في تحديث الحالة:', error);
+        }
+    }
+
+    // معالجة رفع الملفات
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const formData = new FormData(form);
+        
+        // التحقق من اختيار الملفات
+        if (!formData.get('fingerprint1') || !formData.get('fingerprint2')) {
+            alert('الرجاء اختيار صورتين للبصمات');
+            return;
+        }
+
+        try {
+            // تعطيل زر الرفع وإظهار حالة المعالجة
+            uploadButton.disabled = true;
+            uploadButton.innerHTML = '<span class="loading"></span> جاري المعالجة...';
+            processingStatus.style.display = 'block';
+            resultsSection.style.display = 'none';
+
+            // بدء تحديث حالة المعالجة
+            updateProcessingStatus();
+
+            // رفع الملفات
+            const response = await fetch('/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.error) {
+                throw new Error(result.error);
+            }
+
+            // عرض النتائج
+            document.getElementById('match-score').textContent = `${(result.match_score * 100).toFixed(2)}%`;
+            document.getElementById('matching-points').textContent = result.matching_points.length;
+
+            // عرض الصور المعالجة
+            const processed1 = document.getElementById('processed1');
+            const processed2 = document.getElementById('processed2');
+            const matching = document.getElementById('matching');
+
+            processed1.src = result.features1;
+            processed2.src = result.features2;
+            matching.src = result.matching_visualization;
+
+            processed1.style.display = 'block';
+            processed2.style.display = 'block';
+            matching.style.display = 'block';
+
+            // عرض إحصائيات الأداء
+            let performanceHTML = '<h5>خطوات المعالجة:</h5><ul class="list-group">';
+            for (const step of result.performance_stats.steps) {
+                const status = step.status === 'completed' ? 'نجاح' : 'فشل';
+                const statusClass = step.status === 'completed' ? 'success' : 'danger';
+                performanceHTML += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        ${step.name}
+                        <span class="badge bg-${statusClass}">${status}</span>
+                    </li>`;
+            }
+            performanceHTML += '</ul>';
+            
+            performanceHTML += `
+                <div class="mt-3">
+                    <p><strong>الوقت الكلي:</strong> ${result.performance_stats.total_time.toFixed(2)} ثانية</p>
+                    <p><strong>استخدام الذاكرة:</strong> ${(result.performance_stats.memory_usage / 1024 / 1024).toFixed(2)} ميجابايت</p>
+                </div>`;
+
+            document.getElementById('performance-stats').innerHTML = performanceHTML;
+
+            // إظهار قسم النتائج
+            resultsSection.style.display = 'block';
+
+        } catch (error) {
+            alert(`حدث خطأ: ${error.message}`);
+        } finally {
+            // إعادة تفعيل زر الرفع
+            uploadButton.disabled = false;
+            uploadButton.innerHTML = 'مقارنة البصمات';
+            processingStatus.style.display = 'none';
+        }
+    });
+
+    // تحسين تجربة المستخدم عند السحب والإفلات
+    const dropZones = document.querySelectorAll('.form-control[type="file"]');
     
-    matchingPointsContainer.classList.add('updated');
-    setTimeout(() => matchingPointsContainer.classList.remove('updated'), 500);
-} 
+    dropZones.forEach(zone => {
+        zone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            zone.classList.add('dragover');
+        });
+
+        zone.addEventListener('dragleave', () => {
+            zone.classList.remove('dragover');
+        });
+
+        zone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            zone.classList.remove('dragover');
+            
+            if (e.dataTransfer.files.length) {
+                zone.files = e.dataTransfer.files;
+                const event = new Event('change');
+                zone.dispatchEvent(event);
+            }
+        });
+    });
+}); 

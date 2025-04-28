@@ -4,10 +4,59 @@ import cv2
 import numpy as np
 from PIL import Image
 import time
-from fingerprint.preprocessor import preprocess_image
-from fingerprint.feature_extractor import extract_features
-from fingerprint.matcher import compare_fingerprints
-from fingerprint.visualization import draw_minutiae_points, draw_matching_lines
+from fingerprint.preprocessor import Preprocessor
+from fingerprint.feature_extractor import FeatureExtractor
+from fingerprint.matcher import FingerprintMatcher
+from fingerprint.visualization import Visualizer
+
+# إنشاء كائنات المعالجة
+preprocessor = Preprocessor()
+feature_extractor = FeatureExtractor()
+matcher = FingerprintMatcher()
+visualizer = Visualizer()
+
+def check_image_quality(image):
+    """فحص جودة الصورة"""
+    quality_metrics = {
+        'resolution': f"{image.shape[1]}x{image.shape[0]}",
+        'clarity': cv2.Laplacian(image, cv2.CV_64F).var(),
+        'brightness': np.mean(image),
+        'contrast': np.std(image),
+        'noise_ratio': cv2.meanStdDev(image)[1][0][0] / cv2.meanStdDev(image)[0][0][0]
+    }
+    return quality_metrics
+
+def enhance_image(image):
+    """تحسين جودة الصورة"""
+    # تحويل إلى تدرج الرمادي
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    # تحسين التباين
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    enhanced = clahe.apply(gray)
+    
+    # إزالة الضوضاء
+    denoised = cv2.fastNlMeansDenoising(enhanced, None, 10, 7, 21)
+    
+    # تحسين الحواف
+    edges = cv2.Canny(denoised, 100, 200)
+    
+    # تصحيح الإضاءة
+    lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
+    cl = clahe.apply(l)
+    limg = cv2.merge((cl,a,b))
+    final = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+    
+    return {
+        'original': image,
+        'gray': gray,
+        'enhanced': enhanced,
+        'denoised': denoised,
+        'edges': edges,
+        'final': final
+    }
 
 # إعداد الصفحة
 st.set_page_config(
@@ -40,6 +89,19 @@ st.markdown("""
     }
     .css-1d391kg:hover {
         box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .quality-metric {
+        padding: 0.5rem;
+        margin: 0.5rem 0;
+        border-radius: 5px;
+        background-color: #e9ecef;
+    }
+    .preprocessing-step {
+        padding: 1rem;
+        margin: 1rem 0;
+        border-radius: 10px;
+        background-color: #f8f9fa;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 </style>
 """, unsafe_allow_html=True)
@@ -82,45 +144,128 @@ if compare_button and fingerprint1 and fingerprint2:
         img1 = np.array(Image.open(fingerprint1))
         img2 = np.array(Image.open(fingerprint2))
         
-        # حفظ الصور مؤقتاً
+        # فحص جودة الصور
+        status_text.text("جاري فحص جودة الصور...")
+        progress_bar.progress(10)
+        
+        quality1 = check_image_quality(img1)
+        quality2 = check_image_quality(img2)
+        
+        # عرض نتائج فحص الجودة
+        st.markdown("### 📊 جودة الصور")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### البصمة الأولى")
+            for metric, value in quality1.items():
+                st.markdown(f"""
+                <div class="quality-metric">
+                    <strong>{metric}:</strong> {value:.2f}
+                </div>
+                """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown("#### البصمة الثانية")
+            for metric, value in quality2.items():
+                st.markdown(f"""
+                <div class="quality-metric">
+                    <strong>{metric}:</strong> {value:.2f}
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # تحسين الصور
+        status_text.text("جاري تحسين الصور...")
+        progress_bar.progress(20)
+        
+        enhanced1 = enhance_image(img1)
+        enhanced2 = enhance_image(img2)
+        
+        # عرض خطوات المعالجة المسبقة
+        st.markdown("### 🔄 خطوات المعالجة المسبقة")
+        
+        # البصمة الأولى
+        st.markdown("#### البصمة الأولى")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("##### الصورة الأصلية")
+            st.image(enhanced1['original'], use_container_width=True)
+            st.markdown("##### تحسين التباين")
+            st.image(enhanced1['enhanced'], use_container_width=True)
+        
+        with col2:
+            st.markdown("##### تدرج الرمادي")
+            st.image(enhanced1['gray'], use_container_width=True)
+            st.markdown("##### إزالة الضوضاء")
+            st.image(enhanced1['denoised'], use_container_width=True)
+        
+        with col3:
+            st.markdown("##### الحواف")
+            st.image(enhanced1['edges'], use_container_width=True)
+            st.markdown("##### النتيجة النهائية")
+            st.image(enhanced1['final'], use_container_width=True)
+        
+        # البصمة الثانية
+        st.markdown("#### البصمة الثانية")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("##### الصورة الأصلية")
+            st.image(enhanced2['original'], use_container_width=True)
+            st.markdown("##### تحسين التباين")
+            st.image(enhanced2['enhanced'], use_container_width=True)
+        
+        with col2:
+            st.markdown("##### تدرج الرمادي")
+            st.image(enhanced2['gray'], use_container_width=True)
+            st.markdown("##### إزالة الضوضاء")
+            st.image(enhanced2['denoised'], use_container_width=True)
+        
+        with col3:
+            st.markdown("##### الحواف")
+            st.image(enhanced2['edges'], use_container_width=True)
+            st.markdown("##### النتيجة النهائية")
+            st.image(enhanced2['final'], use_container_width=True)
+        
+        # حفظ الصور المؤقتة
         temp_dir = "temp"
         os.makedirs(temp_dir, exist_ok=True)
         
         img1_path = os.path.join(temp_dir, "fp1.jpg")
         img2_path = os.path.join(temp_dir, "fp2.jpg")
         
-        cv2.imwrite(img1_path, cv2.cvtColor(img1, cv2.COLOR_RGB2BGR))
-        cv2.imwrite(img2_path, cv2.cvtColor(img2, cv2.COLOR_RGB2BGR))
+        cv2.imwrite(img1_path, enhanced1['final'])
+        cv2.imwrite(img2_path, enhanced2['final'])
         
         # معالجة الصور
         status_text.text("جاري معالجة الصور...")
-        progress_bar.progress(20)
+        progress_bar.progress(30)
         
-        processed_fp1 = preprocess_image(img1_path)
-        processed_fp2 = preprocess_image(img2_path)
+        processed_fp1 = preprocessor.preprocess_image(img1_path)
+        processed_fp2 = preprocessor.preprocess_image(img2_path)
         
         # استخراج المميزات
         status_text.text("جاري استخراج المميزات...")
         progress_bar.progress(40)
         
-        features1 = extract_features(processed_fp1)
-        features2 = extract_features(processed_fp2)
+        features1 = feature_extractor.extract_features(processed_fp1)
+        features2 = feature_extractor.extract_features(processed_fp2)
         
         # رسم النقاط المميزة
-        marked_fp1 = draw_minutiae_points(processed_fp1, features1)
-        marked_fp2 = draw_minutiae_points(processed_fp2, features2)
+        marked_fp1 = visualizer.visualize_features(processed_fp1, features1)
+        marked_fp2 = visualizer.visualize_features(processed_fp2, features2)
         
         # مقارنة البصمات
         status_text.text("جاري مقارنة البصمات...")
         progress_bar.progress(60)
         
-        match_score, matching_points = compare_fingerprints(features1, features2)
+        match_result = matcher.match_features(features1, features2)
         
         # رسم خطوط التطابق
         status_text.text("جاري إنشاء التصور...")
         progress_bar.progress(80)
         
-        matching_visualization = draw_matching_lines(marked_fp1, marked_fp2, list(zip(features1, features2)))
+        matching_visualization = visualizer.visualize_matching(marked_fp1, marked_fp2, features1, features2, match_result)
         
         # عرض النتائج
         status_text.text("اكتملت العملية!")
@@ -144,24 +289,20 @@ if compare_button and fingerprint1 and fingerprint2:
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.metric("نسبة التطابق", f"{match_score:.2%}")
+            st.metric("نسبة التطابق", f"{match_result['score']:.2%}")
         
         with col2:
-            st.metric("عدد النقاط المميزة في البصمة الأولى", len(features1))
+            st.metric("عدد النقاط المميزة في البصمة الأولى", features1['count'])
         
         with col3:
-            st.metric("عدد النقاط المميزة في البصمة الثانية", len(features2))
+            st.metric("عدد النقاط المميزة في البصمة الثانية", features2['count'])
         
         # عرض النقاط المتطابقة
         st.markdown("### 📍 النقاط المتطابقة")
-        for i, match in enumerate(matching_points):
-            if isinstance(match, tuple) and len(match) == 2:
-                point1, point2 = match
-                st.write(f"نقطة تطابق {i+1}: ({point1.x}, {point1.y}) ↔ ({point2.x}, {point2.y})")
-            elif isinstance(match, dict):
-                point1 = match.get('point1', {})
-                point2 = match.get('point2', {})
-                st.write(f"نقطة تطابق {i+1}: ({point1.get('x', 'N/A')}, {point1.get('y', 'N/A')}) ↔ ({point2.get('x', 'N/A')}, {point2.get('y', 'N/A')})")
+        for i, match in enumerate(match_result['matches']):
+            point1 = features1['minutiae'][match[0]]
+            point2 = features2['minutiae'][match[1]]
+            st.write(f"نقطة تطابق {i+1}: ({point1[0]}, {point1[1]}) ↔ ({point2[0]}, {point2[1]})")
         
         # تنظيف الملفات المؤقتة
         os.remove(img1_path)

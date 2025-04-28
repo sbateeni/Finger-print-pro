@@ -1,6 +1,0 @@
-name: fingerprint-comparison
-version: 1.0.0
-runtime: python
-python_version: 3.11 # تأكد أن pella.app تدعم هذا الإصدار، أو اختر إصداراً مدعوماً
-build_command: pip install -r requirements.txt
-start_command: web: gunicorn app:app --bind 0.0.0.0:$PORT

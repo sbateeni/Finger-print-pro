@@ -1,98 +1,232 @@
+// فئة مراقبة الأداء
 class PerformanceMonitor {
     constructor() {
-        this.progressContainer = document.getElementById('progress-container');
-        this.stepsList = document.getElementById('steps-list');
-        this.systemInfo = document.getElementById('system-info');
-        this.estimatedTime = document.getElementById('estimated-time');
-        this.currentStep = document.getElementById('current-step');
-        this.cpuUsage = document.getElementById('cpu-usage');
-        this.memoryUsage = document.getElementById('memory-usage');
-        this.updateInterval = null;
-    }
-
-    startMonitoring() {
-        this.showProgressContainer();
-        this.updateInterval = setInterval(() => this.updateStatus(), 1000);
-    }
-
-    stopMonitoring() {
-        if (this.updateInterval) {
-            clearInterval(this.updateInterval);
-        }
-        this.hideProgressContainer();
-    }
-
-    showProgressContainer() {
-        this.progressContainer.style.display = 'block';
-    }
-
-    hideProgressContainer() {
-        this.progressContainer.style.display = 'none';
-    }
-
-    updateStatus() {
-        fetch('/status')
-            .then(response => response.json())
-            .then(data => {
-                this.updateStepsList(data.steps);
-                this.updateSystemInfo(data);
-                this.updateProgress(data);
-            })
-            .catch(error => console.error('Error fetching status:', error));
-    }
-
-    updateStepsList(steps) {
-        this.stepsList.innerHTML = '';
-        steps.forEach(step => {
-            const stepElement = document.createElement('div');
-            stepElement.className = `step ${step.status}`;
-            stepElement.innerHTML = `
-                <span class="step-name">${step.name}</span>
-                <span class="step-status">${this.getStatusText(step.status)}</span>
-                ${step.duration ? `<span class="step-duration">${step.duration.toFixed(2)}s</span>` : ''}
-            `;
-            this.stepsList.appendChild(stepElement);
-        });
-    }
-
-    updateSystemInfo(data) {
-        this.cpuUsage.textContent = `${data.cpu_percent}%`;
-        this.memoryUsage.textContent = `${data.memory_percent}%`;
-        
-        if (data.estimated_completion_time) {
-            const remainingTime = Math.ceil((data.estimated_completion_time - Date.now() / 1000));
-            this.estimatedTime.textContent = this.formatTime(remainingTime);
-        }
-    }
-
-    updateProgress(data) {
-        if (data.current_step) {
-            this.currentStep.textContent = data.current_step;
-        }
-    }
-
-    getStatusText(status) {
-        const statusMap = {
-            'in_progress': 'جاري التنفيذ...',
-            'completed': 'تم الانتهاء',
-            'failed': 'فشل'
+        this.startTime = null;
+        this.endTime = null;
+        this.steps = [];
+        this.errors = [];
+        this.warnings = [];
+        this.resourceUsage = {
+            cpu: [],
+            memory: [],
+            disk_io: [],
+            network_io: []
         };
-        return statusMap[status] || status;
+        this.monitoringInterval = null;
     }
 
-    formatTime(seconds) {
-        if (seconds < 60) {
-            return `${seconds} ثانية`;
-        } else if (seconds < 3600) {
-            const minutes = Math.floor(seconds / 60);
-            return `${minutes} دقيقة`;
-        } else {
-            const hours = Math.floor(seconds / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-            return `${hours} ساعة و ${minutes} دقيقة`;
+    // بدء المراقبة
+    startMonitoring() {
+        this.startTime = Date.now();
+        this.monitoringInterval = setInterval(() => this.updateResourceUsage(), 1000);
+        this.updateUI('start');
+    }
+
+    // إيقاف المراقبة
+    stopMonitoring() {
+        this.endTime = Date.now();
+        clearInterval(this.monitoringInterval);
+        this.updateUI('stop');
+        return this.getStats();
+    }
+
+    // إضافة خطوة
+    addStep(name, duration = 0, status = 'pending') {
+        this.steps.push({
+            name,
+            duration,
+            status,
+            timestamp: Date.now()
+        });
+        this.updateUI('step', { name, status });
+    }
+
+    // تحديث خطوة
+    updateStep(name, status, duration = null) {
+        const step = this.steps.find(s => s.name === name);
+        if (step) {
+            step.status = status;
+            if (duration !== null) {
+                step.duration = duration;
+            }
+            this.updateUI('step', { name, status });
         }
+    }
+
+    // تسجيل خطأ
+    logError(message, step = null) {
+        this.errors.push({
+            message,
+            step,
+            timestamp: Date.now()
+        });
+        this.updateUI('error', { message, step });
+    }
+
+    // تسجيل تحذير
+    logWarning(message, step = null) {
+        this.warnings.push({
+            message,
+            step,
+            timestamp: Date.now()
+        });
+        this.updateUI('warning', { message, step });
+    }
+
+    // تحديث استخدام الموارد
+    updateResourceUsage() {
+        if (window.performance && window.performance.memory) {
+            const memory = window.performance.memory.usedJSHeapSize / (1024 * 1024);
+            this.resourceUsage.memory.push(memory);
+        }
+
+        // تحديث واجهة المستخدم
+        this.updateUI('resources', this.resourceUsage);
+    }
+
+    // الحصول على الإحصائيات
+    getStats() {
+        const duration = (this.endTime - this.startTime) / 1000;
+        
+        return {
+            total_duration: duration,
+            steps_count: this.steps.length,
+            errors_count: this.errors.length,
+            warnings_count: this.warnings.length,
+            resource_usage: {
+                cpu: {
+                    mean: this.calculateMean(this.resourceUsage.cpu),
+                    max: Math.max(...this.resourceUsage.cpu),
+                    min: Math.min(...this.resourceUsage.cpu)
+                },
+                memory: {
+                    mean: this.calculateMean(this.resourceUsage.memory),
+                    max: Math.max(...this.resourceUsage.memory),
+                    min: Math.min(...this.resourceUsage.memory)
+                },
+                disk_io: {
+                    total: this.resourceUsage.disk_io.reduce((a, b) => a + b, 0),
+                    mean: this.calculateMean(this.resourceUsage.disk_io)
+                },
+                network_io: {
+                    total: this.resourceUsage.network_io.reduce((a, b) => a + b, 0),
+                    mean: this.calculateMean(this.resourceUsage.network_io)
+                }
+            }
+        };
+    }
+
+    // حساب المتوسط
+    calculateMean(array) {
+        if (array.length === 0) return 0;
+        return array.reduce((a, b) => a + b, 0) / array.length;
+    }
+
+    // تحديث واجهة المستخدم
+    updateUI(type, data) {
+        switch (type) {
+            case 'start':
+                document.getElementById('processing-status').textContent = 'جاري المعالجة...';
+                break;
+                
+            case 'stop':
+                document.getElementById('processing-status').textContent = 'تم الانتهاء';
+                break;
+                
+            case 'step':
+                this.updateStepUI(data.name, data.status);
+                break;
+                
+            case 'error':
+                this.showNotification(data.message, 'error');
+                break;
+                
+            case 'warning':
+                this.showNotification(data.message, 'warning');
+                break;
+                
+            case 'resources':
+                this.updateResourceUI(data);
+                break;
+        }
+    }
+
+    // تحديث واجهة الخطوة
+    updateStepUI(name, status) {
+        const stepElement = document.querySelector(`.step[data-name="${name}"]`);
+        if (stepElement) {
+            stepElement.className = `step ${status}`;
+            stepElement.querySelector('.step-status').textContent = this.getStatusIcon(status);
+        }
+    }
+
+    // الحصول على أيقونة الحالة
+    getStatusIcon(status) {
+        switch (status) {
+            case 'completed':
+                return '✅';
+            case 'in-progress':
+                return '⏳';
+            case 'failed':
+                return '❌';
+            default:
+                return '⭕';
+        }
+    }
+
+    // عرض إشعار
+    showNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+        notification.textContent = message;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 3000);
+    }
+
+    // تحديث واجهة الموارد
+    updateResourceUI(usage) {
+        const metrics = {
+            cpu: document.getElementById('cpu-usage'),
+            memory: document.getElementById('memory-usage'),
+            disk: document.getElementById('disk-usage'),
+            network: document.getElementById('network-usage')
+        };
+
+        if (usage.cpu.length > 0) {
+            metrics.cpu.textContent = `${usage.cpu[usage.cpu.length - 1].toFixed(1)}%`;
+        }
+        
+        if (usage.memory.length > 0) {
+            metrics.memory.textContent = `${usage.memory[usage.memory.length - 1].toFixed(1)} MB`;
+        }
+        
+        if (usage.disk_io.length > 0) {
+            metrics.disk.textContent = this.formatBytes(usage.disk_io[usage.disk_io.length - 1]);
+        }
+        
+        if (usage.network_io.length > 0) {
+            metrics.network.textContent = this.formatBytes(usage.network_io[usage.network_io.length - 1]);
+        }
+    }
+
+    // تنسيق البايت
+    formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        
+        return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`;
     }
 }
+
+// تصدير الفئة
+window.PerformanceMonitor = PerformanceMonitor;
 
 // إنشاء كائن المراقب عند تحميل الصفحة
 const performanceMonitor = new PerformanceMonitor();

@@ -2,6 +2,12 @@ import numpy as np
 from scipy.spatial.distance import cdist
 from scipy.optimize import linear_sum_assignment
 import cv2
+import math
+import logging
+from typing import List, Dict, Tuple, Optional, Union, Any
+from collections import defaultdict
+
+logger = logging.getLogger(__name__)
 
 def align_fingerprints(points1, points2):
     """
@@ -267,3 +273,435 @@ def draw_matching_lines(image1, image2, matching_pairs):
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
     
     return result 
+
+class FingerprintMatcher:
+    def __init__(self):
+        self.distance_threshold = 50.0
+        self.angle_threshold = 30.0
+        self.min_matching_points = 10
+        self.distance_weight = 0.7
+        self.angle_weight = 0.3
+        self.quality_weight = 0.5
+        self.spatial_weight = 0.4
+        self.ridge_weight = 0.3
+        self.minutiae_weight = 0.3
+        self.min_ridge_distance = 5
+        self.max_ridge_distance = 15
+        self.min_quality_score = 0.6
+        self.max_rotation = 30.0
+        self.max_scale = 1.2
+
+    def match_fingerprints(self, features1, features2, threshold=0.6):
+        """مطابقة بصمتين باستخدام النقاط المميزة"""
+        try:
+            # استخراج النقاط المميزة
+            points1 = features1.get('minutiae_points', [])
+            points2 = features2.get('minutiae_points', [])
+            
+            if not points1 or not points2:
+                return 0.0, []
+            
+            # حساب مصفوفة المسافات والزوايا
+            matches = []
+            for p1 in points1:
+                best_match = None
+                min_distance = float('inf')
+                
+                for p2 in points2:
+                    # التحقق من نوع النقطة
+                    if p1.get('type') != p2.get('type'):
+                        continue
+                    
+                    # حساب المسافة الإقليدية
+                    dist = np.sqrt((p1['x'] - p2['x'])**2 + (p1['y'] - p2['y'])**2)
+                    
+                    # حساب فرق الزاوية
+                    angle_diff = abs(p1.get('angle', 0) - p2.get('angle', 0))
+                    angle_diff = min(angle_diff, 360 - angle_diff)  # أخذ أصغر فرق زاوية
+                    
+                    # حساب درجة التطابق بناءً على المسافة والزاوية
+                    match_score = 1.0
+                    if dist > 20:  # تجاهل النقاط البعيدة جداً
+                        continue
+                    match_score *= (1 - dist/20)  # تقليل درجة التطابق مع زيادة المسافة
+                    
+                    if angle_diff > 30:  # تجاهل النقاط بفرق زاوية كبير
+                        continue
+                    match_score *= (1 - angle_diff/30)  # تقليل درجة التطابق مع زيادة فرق الزاوية
+                    
+                    # تحديث أفضل تطابق
+                    if match_score > min_distance:
+                        min_distance = match_score
+                        best_match = (p1, p2, match_score)
+                
+                if best_match and min_distance > threshold:
+                    matches.append(best_match)
+            
+            # حساب درجة التطابق النهائية
+            if not matches:
+                return 0.0, []
+            
+            # حساب متوسط درجة التطابق
+            match_score = np.mean([m[2] for m in matches])
+            
+            # حساب نسبة النقاط المتطابقة
+            match_ratio = len(matches) / min(len(points1), len(points2))
+            
+            # الجمع بين درجة التطابق ونسبة النقاط المتطابقة
+            final_score = match_score * match_ratio
+            
+            return final_score, matches
+            
+        except Exception as e:
+            logger.error(f'خطأ في مطابقة البصمات: {str(e)}')
+            return 0.0, []
+
+    def _align_fingerprints(self, features1: List[Dict], features2: List[Dict]) -> Tuple[List[Dict], List[Dict]]:
+        """
+        محاذاة البصمتين
+        """
+        try:
+            # تحويل النقاط إلى مصفوفات
+            coords1 = np.array([[f['x'], f['y']] for f in features1])
+            coords2 = np.array([[f['x'], f['y']] for f in features2])
+
+            # حساب مركز الكتلة
+            center1 = np.mean(coords1, axis=0)
+            center2 = np.mean(coords2, axis=0)
+
+            # إزاحة النقاط إلى المركز
+            centered1 = coords1 - center1
+            centered2 = coords2 - center2
+
+            # حساب زوايا النقاط
+            angles1 = np.array([f['angle'] for f in features1])
+            angles2 = np.array([f['angle'] for f in features2])
+
+            # حساب متوسط فرق الزوايا
+            angle_diff = np.mean(angles1) - np.mean(angles2)
+            angle_diff = min(angle_diff, 360 - angle_diff)
+
+            # تدوير النقاط
+            rotation_matrix = np.array([
+                [np.cos(np.radians(angle_diff)), -np.sin(np.radians(angle_diff))],
+                [np.sin(np.radians(angle_diff)), np.cos(np.radians(angle_diff))]
+            ])
+
+            aligned2 = np.dot(centered2, rotation_matrix.T) + center1
+
+            # تحديث إحداثيات النقاط
+            aligned_features1 = features1.copy()
+            aligned_features2 = []
+            for i, f in enumerate(features2):
+                aligned_f = f.copy()
+                aligned_f['x'] = aligned2[i, 0]
+                aligned_f['y'] = aligned2[i, 1]
+                aligned_f['angle'] = (f['angle'] + angle_diff) % 360
+                aligned_features2.append(aligned_f)
+
+            return aligned_features1, aligned_features2
+
+        except Exception as e:
+            logger.error(f'خطأ في محاذاة البصمات: {str(e)}')
+            raise
+
+    def _create_distance_matrix(self, features1: List[Dict], features2: List[Dict]) -> np.ndarray:
+        """
+        إنشاء مصفوفة المسافات بين المميزات
+        """
+        try:
+            n_features1 = len(features1)
+            n_features2 = len(features2)
+            distance_matrix = np.zeros((n_features1, n_features2))
+
+            for i, f1 in enumerate(features1):
+                for j, f2 in enumerate(features2):
+                    distance_matrix[i, j] = self._calculate_feature_distance(f1, f2)
+
+            return distance_matrix
+
+        except Exception as e:
+            logger.error(f'خطأ في إنشاء مصفوفة المسافات: {str(e)}')
+            raise
+
+    def _calculate_feature_distance(self, feature1: Dict, feature2: Dict) -> float:
+        """
+        حساب المسافة بين مميزتين
+        """
+        try:
+            # حساب المسافة المكانية
+            spatial_distance = math.sqrt(
+                (feature1['x'] - feature2['x'])**2 +
+                (feature1['y'] - feature2['y'])**2
+            )
+
+            # حساب الفرق في الزوايا
+            angle_diff = min(
+                abs(feature1['angle'] - feature2['angle']),
+                360 - abs(feature1['angle'] - feature2['angle'])
+            )
+
+            # حساب المسافة بين الخطوط
+            ridge_distance = self._calculate_ridge_distance(feature1, feature2)
+
+            # حساب المسافة الكلية (مرجحة)
+            total_distance = (
+                self.spatial_weight * spatial_distance +
+                self.angle_weight * angle_diff +
+                self.ridge_weight * ridge_distance
+            )
+
+            # تطبيق وزن الجودة
+            if 'quality' in feature1 and 'quality' in feature2:
+                quality_factor = (
+                    self.quality_weight * feature1['quality'] +
+                    self.quality_weight * feature2['quality']
+                )
+                total_distance *= (1 - quality_factor)
+
+            return total_distance
+
+        except Exception as e:
+            logger.error(f'خطأ في حساب المسافة بين المميزات: {str(e)}')
+            raise
+
+    def _calculate_ridge_distance(self, feature1: Dict, feature2: Dict) -> float:
+        """
+        حساب المسافة بين الخطوط
+        """
+        try:
+            # حساب المسافة بين الخطوط
+            ridge_distance = abs(feature1.get('ridge_distance', 0) - feature2.get('ridge_distance', 0))
+
+            # تطبيع المسافة
+            if ridge_distance < self.min_ridge_distance:
+                ridge_distance = 0
+            elif ridge_distance > self.max_ridge_distance:
+                ridge_distance = 1
+            else:
+                ridge_distance = (ridge_distance - self.min_ridge_distance) / (self.max_ridge_distance - self.min_ridge_distance)
+
+            return ridge_distance
+
+        except Exception as e:
+            logger.error(f'خطأ في حساب المسافة بين الخطوط: {str(e)}')
+            raise
+
+    def _calculate_match_score(self, distance_matrix: np.ndarray,
+                             row_ind: np.ndarray, col_ind: np.ndarray) -> float:
+        """
+        حساب درجة التطابق
+        """
+        try:
+            # حساب المسافة الإجمالية للنقاط المتطابقة
+            total_distance = distance_matrix[row_ind, col_ind].sum()
+
+            # حساب الحد الأقصى للمسافة الممكنة
+            max_possible_distance = len(row_ind) * 100.0
+
+            # حساب درجة التطابق
+            match_score = 1.0 - (total_distance / max_possible_distance)
+
+            # تطبيق معامل الجودة
+            if 'quality' in distance_matrix:
+                quality_factor = np.mean([
+                    distance_matrix[i, j]['quality']
+                    for i, j in zip(row_ind, col_ind)
+                ])
+                match_score *= (1.0 + quality_factor)
+
+            return max(0.0, min(1.0, match_score))
+
+        except Exception as e:
+            logger.error(f'خطأ في حساب درجة التطابق: {str(e)}')
+            raise
+
+    def _filter_matching_points(self, features1: List[Dict], features2: List[Dict],
+                              row_ind: np.ndarray, col_ind: np.ndarray,
+                              distance_matrix: np.ndarray) -> List[Tuple[Dict, Dict]]:
+        """
+        تصفية النقاط المتطابقة
+        """
+        try:
+            matching_points = []
+
+            for i, j in zip(row_ind, col_ind):
+                if distance_matrix[i, j] < self.distance_threshold:
+                    f1 = features1[i]
+                    f2 = features2[j]
+
+                    # التحقق من أن النقاط ليست على الحافة
+                    if self._is_on_edge(f1) or self._is_on_edge(f2):
+                        continue
+
+                    # التحقق من أن النقاط ليست في منطقة مزدحمة
+                    if self._is_crowded(f1, features1) or self._is_crowded(f2, features2):
+                        continue
+
+                    # التحقق من جودة النقاط
+                    if 'quality' in f1 and 'quality' in f2:
+                        if f1['quality'] < self.min_quality_score or f2['quality'] < self.min_quality_score:
+                            continue
+
+                    matching_points.append((f1, f2))
+
+            return matching_points
+
+        except Exception as e:
+            logger.error(f'خطأ في تصفية النقاط المتطابقة: {str(e)}')
+            raise
+
+    def _is_on_edge(self, feature: Dict) -> bool:
+        """
+        التحقق من أن النقطة على الحافة
+        """
+        try:
+            # التحقق من أن النقطة ليست قريبة من الحواف
+            if (feature['x'] < self.distance_threshold or
+                feature['y'] < self.distance_threshold):
+                return True
+
+            return False
+
+        except Exception as e:
+            logger.error(f'خطأ في التحقق من الحافة: {str(e)}')
+            raise
+
+    def _is_crowded(self, feature: Dict, all_features: List[Dict]) -> bool:
+        """
+        التحقق من أن النقطة في منطقة مزدحمة
+        """
+        try:
+            count = 0
+            for other_feature in all_features:
+                if feature == other_feature:
+                    continue
+
+                distance = math.sqrt(
+                    (feature['x'] - other_feature['x'])**2 +
+                    (feature['y'] - other_feature['y'])**2
+                )
+
+                if distance < self.distance_threshold:
+                    count += 1
+
+            return count > 2
+
+        except Exception as e:
+            logger.error(f'خطأ في التحقق من الازدحام: {str(e)}')
+            raise
+
+    def _calculate_quality_score(self, matching_points: List[Tuple[Dict, Dict]]) -> float:
+        """
+        حساب درجة جودة التطابق
+        """
+        try:
+            if not matching_points:
+                return 0.0
+
+            # حساب متوسط جودة النقاط المتطابقة
+            quality_scores = []
+            for f1, f2 in matching_points:
+                if 'quality' in f1 and 'quality' in f2:
+                    quality_scores.append((f1['quality'] + f2['quality']) / 2)
+
+            if not quality_scores:
+                return 0.0
+
+            return np.mean(quality_scores)
+
+        except Exception as e:
+            logger.error(f'خطأ في حساب درجة الجودة: {str(e)}')
+            raise
+
+    def match_features(self, features1: Dict[str, Any], features2: Dict[str, Any]) -> Dict[str, Any]:
+        """مطابقة المميزات بين صورتين"""
+        try:
+            # التحقق من وجود نقاط كافية
+            if features1['count'] < self.min_points or features2['count'] < self.min_points:
+                raise ValueError("لا توجد نقاط مميزة كافية في إحدى الصورتين")
+            
+            # استخراج النقاط المميزة
+            minutiae1 = features1['minutiae']
+            minutiae2 = features2['minutiae']
+            
+            # حساب مصفوفة المسافات
+            distances = self._calculate_distances(minutiae1, minutiae2)
+            
+            # تطبيق خوارزمية المطابقة
+            matches = self._match_minutiae(distances)
+            
+            # حساب درجة التطابق
+            score = self._calculate_score(matches, features1['count'], features2['count'])
+            
+            return {
+                'score': score,
+                'matches': matches,
+                'count1': features1['count'],
+                'count2': features2['count']
+            }
+            
+        except Exception as e:
+            logger.error(f'خطأ في مطابقة المميزات: {str(e)}')
+            raise
+
+    def _calculate_distances(self, minutiae1: List[Tuple[int, int, str, float]], 
+                           minutiae2: List[Tuple[int, int, str, float]]) -> np.ndarray:
+        """حساب مصفوفة المسافات بين النقاط المميزة"""
+        n1 = len(minutiae1)
+        n2 = len(minutiae2)
+        distances = np.zeros((n1, n2))
+        
+        for i, m1 in enumerate(minutiae1):
+            for j, m2 in enumerate(minutiae2):
+                # حساب المسافة الإقليدية
+                dist = np.sqrt((m1[0] - m2[0])**2 + (m1[1] - m2[1])**2)
+                
+                # حساب فرق الزاوية
+                angle_diff = abs(m1[3] - m2[3])
+                angle_diff = min(angle_diff, 360 - angle_diff)
+                
+                # حساب المسافة النهائية
+                distances[i,j] = dist + self.angle_weight * angle_diff
+                
+        return distances
+
+    def _match_minutiae(self, distances: np.ndarray) -> List[Tuple[int, int]]:
+        """مطابقة النقاط المميزة باستخدام خوارزمية المجاورة القريبة"""
+        matches = []
+        used1 = set()
+        used2 = set()
+        
+        # ترتيب المسافات
+        sorted_distances = []
+        for i in range(distances.shape[0]):
+            for j in range(distances.shape[1]):
+                sorted_distances.append((distances[i,j], i, j))
+        sorted_distances.sort()
+        
+        # تطبيق خوارزمية المجاورة القريبة
+        for dist, i, j in sorted_distances:
+            if i in used1 or j in used2:
+                continue
+                
+            if dist > self.max_distance:
+                break
+                
+            matches.append((i, j))
+            used1.add(i)
+            used2.add(j)
+            
+        return matches
+
+    def _calculate_score(self, matches: List[Tuple[int, int]], count1: int, count2: int) -> float:
+        """حساب درجة التطابق"""
+        if not matches:
+            return 0.0
+            
+        # حساب نسبة النقاط المتطابقة
+        match_ratio = len(matches) / min(count1, count2)
+        
+        # حساب درجة التطابق النهائية
+        score = match_ratio * 100.0
+        
+        return min(max(score, 0.0), 100.0) 
