@@ -51,6 +51,10 @@ class Preprocessor:
             if not isinstance(image, np.ndarray):
                 raise ValueError("الصورة يجب أن تكون من نوع numpy array")
             
+            # التأكد من أن الصورة في التنسيق الصحيح
+            if image.dtype != np.uint8:
+                image = image.astype(np.uint8)
+            
             # تحويل الصورة إلى تدرج رمادي
             if len(image.shape) == 3:
                 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)

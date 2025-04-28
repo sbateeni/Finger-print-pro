@@ -60,158 +60,10 @@ def enhance_image(image):
 
 def process_fingerprints(fingerprint1, fingerprint2):
     try:
-        # تحويل الصور إلى numpy array
-        img1 = np.array(Image.open(fingerprint1))
-        img2 = np.array(Image.open(fingerprint2))
+        # إنشاء شريط تقدم
+        progress_bar = st.progress(0)
+        status_text = st.empty()
         
-        # التحقق من نوع الصورة
-        if not isinstance(img1, np.ndarray) or not isinstance(img2, np.ndarray):
-            st.error("خطأ في تحميل الصور. يرجى التأكد من أن الصور صالحة.")
-            return None
-        
-        # التحقق من أبعاد الصورة
-        if len(img1.shape) < 2 or len(img2.shape) < 2:
-            st.error("خطأ في أبعاد الصور. يرجى التأكد من أن الصور صالحة.")
-            return None
-        
-        # عرض الصور الأصلية
-        col1, col2 = st.columns(2)
-        with col1:
-            st.image(fingerprint1, caption="البصمة الأولى", use_container_width=True)
-        with col2:
-            st.image(fingerprint2, caption="البصمة الثانية", use_container_width=True)
-        
-        # فحص جودة الصور
-        status_text.text("جاري فحص جودة الصور...")
-        quality1 = check_image_quality(img1)
-        quality2 = check_image_quality(img2)
-        
-        # تحسين الصور
-        status_text.text("جاري تحسين الصور...")
-        enhanced1 = enhance_image(img1)
-        enhanced2 = enhance_image(img2)
-        
-        # استخراج المميزات
-        status_text.text("جاري استخراج المميزات...")
-        features1 = feature_extractor.extract_features(enhanced1)
-        features2 = feature_extractor.extract_features(enhanced2)
-        
-        # مقارنة البصمات
-        status_text.text("جاري مقارنة البصمات...")
-        match_score = matcher.match_features(features1, features2)
-        
-        # عرض النتائج
-        st.success(f"تم العثور على {len(features1['minutiae'])} نقطة مميزة في البصمة الأولى")
-        st.success(f"تم العثور على {len(features2['minutiae'])} نقطة مميزة في البصمة الثانية")
-        st.success(f"نسبة التطابق: {match_score:.2f}%")
-        
-        # عرض الصور المعالجة
-        st.subheader("الصور المعالجة")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.image(enhanced1, caption="البصمة الأولى بعد المعالجة", use_container_width=True)
-        with col2:
-            st.image(enhanced2, caption="البصمة الثانية بعد المعالجة", use_container_width=True)
-        
-        # عرض نتائج المطابقة
-        st.subheader("نتائج المطابقة")
-        matching_result = visualizer.visualize_matching(enhanced1, enhanced2, features1, features2)
-        st.image(matching_result, caption="نتائج المطابقة", use_container_width=True)
-        
-        return {
-            'quality1': quality1,
-            'quality2': quality2,
-            'features1': features1,
-            'features2': features2,
-            'match_score': match_score
-        }
-        
-    except Exception as e:
-        st.error(f"حدث خطأ أثناء معالجة الصور: {str(e)}")
-        return None
-
-# إعداد الصفحة
-st.set_page_config(
-    page_title="نظام مقارنة البصمات",
-    page_icon="👆",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# تخصيص CSS
-st.markdown("""
-<style>
-    .main {
-        direction: rtl;
-        text-align: right;
-    }
-    .stButton>button {
-        width: 100%;
-        border-radius: 20px;
-        height: 3em;
-        font-size: 1.2em;
-    }
-    .stProgress > div > div > div {
-        background-color: #0d6efd;
-    }
-    .css-1d391kg {
-        padding: 1rem;
-        border-radius: 10px;
-        background-color: #f8f9fa;
-    }
-    .css-1d391kg:hover {
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-    .quality-metric {
-        padding: 0.5rem;
-        margin: 0.5rem 0;
-        border-radius: 5px;
-        background-color: #e9ecef;
-    }
-    .preprocessing-step {
-        padding: 1rem;
-        margin: 1rem 0;
-        border-radius: 10px;
-        background-color: #f8f9fa;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# العنوان الرئيسي
-st.title("👆 نظام مقارنة البصمات")
-st.markdown("---")
-
-# إنشاء عمودين للصور
-col1, col2 = st.columns(2)
-
-# رفع الصور
-with col1:
-    st.subheader("البصمة الأولى")
-    fingerprint1 = st.file_uploader("اختر صورة البصمة الأولى", type=['png', 'jpg', 'jpeg'], key="fp1")
-
-with col2:
-    st.subheader("البصمة الثانية")
-    fingerprint2 = st.file_uploader("اختر صورة البصمة الثانية", type=['png', 'jpg', 'jpeg'], key="fp2")
-
-# زر المقارنة
-compare_button = st.button("🔍 مقارنة البصمات", type="primary")
-
-# عرض الصور المرفوعة
-if fingerprint1 and fingerprint2:
-    col1, col2 = st.columns(2)
-    with col1:
-        st.image(fingerprint1, caption="البصمة الأولى", use_container_width=True)
-    with col2:
-        st.image(fingerprint2, caption="البصمة الثانية", use_container_width=True)
-
-# معالجة المقارنة
-if compare_button and fingerprint1 and fingerprint2:
-    # إنشاء شريط تقدم
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    try:
         # تحويل الصور إلى numpy arrays
         img1 = np.array(Image.open(fingerprint1))
         img2 = np.array(Image.open(fingerprint2))
@@ -219,12 +71,12 @@ if compare_button and fingerprint1 and fingerprint2:
         # التحقق من نوع الصورة
         if not isinstance(img1, np.ndarray) or not isinstance(img2, np.ndarray):
             st.error("خطأ في تحميل الصور. يرجى التأكد من أن الصور صالحة.")
-            return
+            return None
         
         # التحقق من أبعاد الصورة
         if len(img1.shape) < 2 or len(img2.shape) < 2:
             st.error("خطأ في أبعاد الصور. يرجى التأكد من أن الصور صالحة.")
-            return
+            return None
         
         # عرض الصور الأصلية
         col1, col2 = st.columns(2)
@@ -355,12 +207,12 @@ if compare_button and fingerprint1 and fingerprint2:
         # التحقق من نوع الصورة
         if not isinstance(img1_array, np.ndarray) or not isinstance(img2_array, np.ndarray):
             st.error("خطأ في تحميل الصور. يرجى التأكد من أن الصور صالحة.")
-            return
+            return None
         
         # التحقق من أبعاد الصورة
         if len(img1_array.shape) < 2 or len(img2_array.shape) < 2:
             st.error("خطأ في أبعاد الصور. يرجى التأكد من أن الصور صالحة.")
-            return
+            return None
         
         # تحويل الصور إلى numpy arrays
         processed_fp1 = preprocessor.preprocess_image(img1_array)
@@ -436,14 +288,107 @@ if compare_button and fingerprint1 and fingerprint2:
         os.remove(img1_path)
         os.remove(img2_path)
         
-        results = process_fingerprints(fingerprint1, fingerprint2)
-        if results is None:
-            st.error("فشلت عملية معالجة البصمات")
+        return {
+            'quality1': quality1,
+            'quality2': quality2,
+            'features1': features1,
+            'features2': features2,
+            'match_result': match_result
+        }
         
     except Exception as e:
         st.error(f"حدث خطأ: {str(e)}")
         progress_bar.progress(0)
         status_text.text("فشلت العملية!")
+        return None
+
+# إعداد الصفحة
+st.set_page_config(
+    page_title="نظام مقارنة البصمات",
+    page_icon="👆",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# تخصيص CSS
+st.markdown("""
+<style>
+    .main {
+        direction: rtl;
+        text-align: right;
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 20px;
+        height: 3em;
+        font-size: 1.2em;
+    }
+    .stProgress > div > div > div {
+        background-color: #0d6efd;
+    }
+    .css-1d391kg {
+        padding: 1rem;
+        border-radius: 10px;
+        background-color: #f8f9fa;
+    }
+    .css-1d391kg:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .quality-metric {
+        padding: 0.5rem;
+        margin: 0.5rem 0;
+        border-radius: 5px;
+        background-color: #e9ecef;
+    }
+    .preprocessing-step {
+        padding: 1rem;
+        margin: 1rem 0;
+        border-radius: 10px;
+        background-color: #f8f9fa;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# العنوان الرئيسي
+st.title("👆 نظام مقارنة البصمات")
+st.markdown("---")
+
+# إنشاء عمودين للصور
+col1, col2 = st.columns(2)
+
+# رفع الصور
+with col1:
+    st.subheader("البصمة الأولى")
+    fingerprint1 = st.file_uploader("اختر صورة البصمة الأولى", type=['png', 'jpg', 'jpeg'], key="fp1")
+
+with col2:
+    st.subheader("البصمة الثانية")
+    fingerprint2 = st.file_uploader("اختر صورة البصمة الثانية", type=['png', 'jpg', 'jpeg'], key="fp2")
+
+# زر المقارنة
+compare_button = st.button("🔍 مقارنة البصمات", type="primary")
+
+# عرض الصور المرفوعة
+if fingerprint1 and fingerprint2:
+    col1, col2 = st.columns(2)
+    with col1:
+        st.image(fingerprint1, caption="البصمة الأولى", use_container_width=True)
+    with col2:
+        st.image(fingerprint2, caption="البصمة الثانية", use_container_width=True)
+
+# معالجة المقارنة
+if compare_button and fingerprint1 and fingerprint2:
+    # إنشاء شريط تقدم
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    try:
+        results = process_fingerprints(fingerprint1, fingerprint2)
+        if results is None:
+            st.error("فشلت عملية معالجة البصمات")
+    except Exception as e:
+        st.error(f"حدث خطأ: {str(e)}")
 
 # معلومات إضافية في الشريط الجانبي
 with st.sidebar:
