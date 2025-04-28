@@ -121,8 +121,44 @@ if st.button("بدء المعالجة والمقارنة"):
             col1, col2 = st.columns(2)
             with col1:
                 st.image(fp1_vis, caption="النقاط المميزة - البصمة الأولى", use_container_width=True)
+                # إحصائيات النقاط المميزة للبصمة الأولى
+                minutiae_counts = {
+                    'ridge_ending': sum(1 for t in fp1_features['minutiae_types'] if t == 'ridge_ending'),
+                    'bifurcation': sum(1 for t in fp1_features['minutiae_types'] if t == 'bifurcation'),
+                    'unknown': sum(1 for t in fp1_features['minutiae_types'] if t == 'unknown')
+                }
+                st.markdown("""
+                #### إحصائيات النقاط المميزة - البصمة الأولى
+                - 🔴 نقاط نهاية الخطوط (أحمر): {}
+                - 🟢 نقاط التفرع (أخضر): {}
+                - 🔵 نقاط غير معروفة (أزرق): {}
+                - 📊 إجمالي النقاط: {}
+                """.format(
+                    minutiae_counts['ridge_ending'],
+                    minutiae_counts['bifurcation'],
+                    minutiae_counts['unknown'],
+                    len(fp1_features['minutiae_types'])
+                ))
             with col2:
                 st.image(fp2_vis, caption="النقاط المميزة - البصمة الثانية", use_container_width=True)
+                # إحصائيات النقاط المميزة للبصمة الثانية
+                minutiae_counts = {
+                    'ridge_ending': sum(1 for t in fp2_features['minutiae_types'] if t == 'ridge_ending'),
+                    'bifurcation': sum(1 for t in fp2_features['minutiae_types'] if t == 'bifurcation'),
+                    'unknown': sum(1 for t in fp2_features['minutiae_types'] if t == 'unknown')
+                }
+                st.markdown("""
+                #### إحصائيات النقاط المميزة - البصمة الثانية
+                - 🔴 نقاط نهاية الخطوط (أحمر): {}
+                - 🟢 نقاط التفرع (أخضر): {}
+                - 🔵 نقاط غير معروفة (أزرق): {}
+                - 📊 إجمالي النقاط: {}
+                """.format(
+                    minutiae_counts['ridge_ending'],
+                    minutiae_counts['bifurcation'],
+                    minutiae_counts['unknown'],
+                    len(fp2_features['minutiae_types'])
+                ))
             
             # عرض نتيجة المطابقة
             st.subheader("نتيجة المطابقة")
