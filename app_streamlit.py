@@ -4,10 +4,17 @@ import numpy as np
 from PIL import Image
 import io
 import base64
-from fingerprint.preprocessor import preprocess_image, enhance_image_quality, check_image_quality
-from fingerprint.feature_extractor import extract_features
-from fingerprint.matcher import match_fingerprints
-from fingerprint.visualization import visualize_features, visualize_matching, plot_quality_metrics
+import gc
+
+# Import fingerprint processing modules with error handling
+try:
+    from fingerprint.preprocessor import preprocess_image, enhance_image_quality, check_image_quality
+    from fingerprint.feature_extractor import extract_features
+    from fingerprint.matcher import match_fingerprints
+    from fingerprint.visualization import visualize_features, visualize_matching, plot_quality_metrics
+except ImportError as e:
+    st.error(f"Error importing fingerprint modules: {str(e)}")
+    st.stop()
 
 # تكوين الصفحة
 st.set_page_config(
@@ -134,58 +141,65 @@ with col2:
 # زر المقارنة
 if st.button("مقارنة البصمات", key="compare"):
     if fp1_file and fp2_file:
-        with st.spinner("جاري معالجة البصمات..."):
-            # تحويل الصور إلى مصفوفات NumPy
-            fp1_array = np.array(Image.open(fp1_file))
-            fp2_array = np.array(Image.open(fp2_file))
-            
-            # معالجة البصمات
-            fp1_processed = preprocess_image(fp1_array)
-            fp2_processed = preprocess_image(fp2_array)
-            
-            # استخراج المميزات
-            fp1_features = extract_features(fp1_processed)
-            fp2_features = extract_features(fp2_processed)
-            
-            # مقارنة البصمات
-            match_result = match_fingerprints(fp1_features, fp2_features)
-            
-            # تصور النتائج
-            fp1_vis = visualize_features(fp1_processed, fp1_features)
-            fp2_vis = visualize_features(fp2_processed, fp2_features)
-            matching_vis = visualize_matching(fp1_processed, fp2_processed, fp1_features, fp2_features, match_result)
-            
-            # عرض النتائج
-            st.markdown('<div class="result-box">', unsafe_allow_html=True)
-            st.markdown("### نتائج المقارنة")
-            
-            # عرض الصور المعالجة
-            col1, col2 = st.columns(2)
-            with col1:
+        try:
+            with st.spinner("جاري معالجة البصمات..."):
+                # تحويل الصور إلى مصفوفات NumPy
+                fp1_array = np.array(Image.open(fp1_file))
+                fp2_array = np.array(Image.open(fp2_file))
+                
+                # معالجة البصمات
+                fp1_processed = preprocess_image(fp1_array)
+                fp2_processed = preprocess_image(fp2_array)
+                
+                # استخراج المميزات
+                fp1_features = extract_features(fp1_processed)
+                fp2_features = extract_features(fp2_processed)
+                
+                # مقارنة البصمات
+                match_result = match_fingerprints(fp1_features, fp2_features)
+                
+                # تصور النتائج
+                fp1_vis = visualize_features(fp1_processed, fp1_features)
+                fp2_vis = visualize_features(fp2_processed, fp2_features)
+                matching_vis = visualize_matching(fp1_processed, fp2_processed, fp1_features, fp2_features, match_result)
+                
+                # عرض النتائج
+                st.markdown('<div class="result-box">', unsafe_allow_html=True)
+                st.markdown("### نتائج المقارنة")
+                
+                # عرض الصور المعالجة
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown('<div class="image-container">', unsafe_allow_html=True)
+                    st.image(fp1_vis, caption="البصمة الأولى بعد المعالجة", use_container_width=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+                
+                with col2:
+                    st.markdown('<div class="image-container">', unsafe_allow_html=True)
+                    st.image(fp2_vis, caption="البصمة الثانية بعد المعالجة", use_container_width=True)
+                    st.markdown('</div>', unsafe_allow_html=True)
+                
+                # عرض صورة المقارنة
                 st.markdown('<div class="image-container">', unsafe_allow_html=True)
-                st.image(fp1_vis, caption="البصمة الأولى بعد المعالجة", use_container_width=True)
+                st.image(matching_vis, caption="تمثيل بصري للتطابق بين البصمتين", use_container_width=True)
                 st.markdown('</div>', unsafe_allow_html=True)
-            
-            with col2:
-                st.markdown('<div class="image-container">', unsafe_allow_html=True)
-                st.image(fp2_vis, caption="البصمة الثانية بعد المعالجة", use_container_width=True)
+                
+                # عرض نتيجة المقارنة
+                st.markdown(f'<div class="match-score">نسبة التطابق: {match_result["score"]:.2f}%</div>', unsafe_allow_html=True)
+                
+                # عرض الحكم النهائي
+                if match_result["is_match"]:
+                    st.markdown('<div class="match-result match">البصمتان متطابقتان</div>', unsafe_allow_html=True)
+                else:
+                    st.markdown('<div class="match-result no-match">البصمتان غير متطابقتين</div>', unsafe_allow_html=True)
+                
                 st.markdown('</div>', unsafe_allow_html=True)
-            
-            # عرض صورة المقارنة
-            st.markdown('<div class="image-container">', unsafe_allow_html=True)
-            st.image(matching_vis, caption="تمثيل بصري للتطابق بين البصمتين", use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            # عرض نتيجة المقارنة
-            st.markdown(f'<div class="match-score">نسبة التطابق: {match_result["score"]:.2f}%</div>', unsafe_allow_html=True)
-            
-            # عرض الحكم النهائي
-            if match_result["is_match"]:
-                st.markdown('<div class="match-result match">البصمتان متطابقتان</div>', unsafe_allow_html=True)
-            else:
-                st.markdown('<div class="match-result no-match">البصمتان غير متطابقتين</div>', unsafe_allow_html=True)
-            
-            st.markdown('</div>', unsafe_allow_html=True)
+                
+                # تنظيف الذاكرة
+                gc.collect()
+                
+        except Exception as e:
+            st.error(f"حدث خطأ أثناء معالجة البصمات: {str(e)}")
     else:
         st.error("الرجاء اختيار كلا البصمتين للمقارنة")
 
