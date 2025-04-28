@@ -47,23 +47,71 @@ col1, col2 = st.columns(2)
 
 with col1:
     st.subheader("البصمة الأولى")
-    fp1_file = st.file_uploader("اختر البصمة الأولى", type=['png', 'jpg', 'jpeg'], key="fp1")
-    if fp1_file:
-        try:
-            fp1_image = Image.open(fp1_file)
-            st.image(fp1_image, caption="البصمة الأولى", use_container_width=True)
-        except Exception as e:
-            st.error(f"خطأ في تحميل الصورة: {str(e)}")
+    capture_method = st.radio("طريقة إدخال البصمة الأولى", ["تحميل ملف", "التقاط صورة", "قاعدة البيانات"], key="method1")
+    if capture_method == "تحميل ملف":
+        fp1_file = st.file_uploader("اختر البصمة الأولى", type=['png', 'jpg', 'jpeg'], key="fp1")
+        if fp1_file:
+            try:
+                fp1_image = Image.open(fp1_file)
+                st.image(fp1_image, caption="البصمة الأولى", use_container_width=True)
+            except Exception as e:
+                st.error(f"خطأ في تحميل الصورة: {str(e)}")
+    elif capture_method == "التقاط صورة":
+        fp1_camera = st.camera_input("التقاط صورة البصمة الأولى", key="camera1")
+        if fp1_camera:
+            try:
+                fp1_image = Image.open(fp1_camera)
+                st.image(fp1_image, caption="البصمة الأولى", use_container_width=True)
+            except Exception as e:
+                st.error(f"خطأ في التقاط الصورة: {str(e)}")
+    else:
+        # قائمة البصمات في قاعدة البيانات
+        database_fingerprints = {
+            "بصمة 1": "fingerprints/fp1.jpg",
+            "بصمة 2": "fingerprints/fp2.jpg",
+            "بصمة 3": "fingerprints/fp3.jpg"
+        }
+        selected_fp = st.selectbox("اختر البصمة من قاعدة البيانات", list(database_fingerprints.keys()), key="db1")
+        if selected_fp:
+            try:
+                fp1_image = Image.open(database_fingerprints[selected_fp])
+                st.image(fp1_image, caption="البصمة الأولى", use_container_width=True)
+            except Exception as e:
+                st.error(f"خطأ في تحميل البصمة من قاعدة البيانات: {str(e)}")
 
 with col2:
     st.subheader("البصمة الثانية")
-    fp2_file = st.file_uploader("اختر البصمة الثانية", type=['png', 'jpg', 'jpeg'], key="fp2")
-    if fp2_file:
-        try:
-            fp2_image = Image.open(fp2_file)
-            st.image(fp2_image, caption="البصمة الثانية", use_container_width=True)
-        except Exception as e:
-            st.error(f"خطأ في تحميل الصورة: {str(e)}")
+    capture_method = st.radio("طريقة إدخال البصمة الثانية", ["تحميل ملف", "التقاط صورة", "قاعدة البيانات"], key="method2")
+    if capture_method == "تحميل ملف":
+        fp2_file = st.file_uploader("اختر البصمة الثانية", type=['png', 'jpg', 'jpeg'], key="fp2")
+        if fp2_file:
+            try:
+                fp2_image = Image.open(fp2_file)
+                st.image(fp2_image, caption="البصمة الثانية", use_container_width=True)
+            except Exception as e:
+                st.error(f"خطأ في تحميل الصورة: {str(e)}")
+    elif capture_method == "التقاط صورة":
+        fp2_camera = st.camera_input("التقاط صورة البصمة الثانية", key="camera2")
+        if fp2_camera:
+            try:
+                fp2_image = Image.open(fp2_camera)
+                st.image(fp2_image, caption="البصمة الثانية", use_container_width=True)
+            except Exception as e:
+                st.error(f"خطأ في التقاط الصورة: {str(e)}")
+    else:
+        # قائمة البصمات في قاعدة البيانات
+        database_fingerprints = {
+            "بصمة 1": "fingerprints/fp1.jpg",
+            "بصمة 2": "fingerprints/fp2.jpg",
+            "بصمة 3": "fingerprints/fp3.jpg"
+        }
+        selected_fp = st.selectbox("اختر البصمة من قاعدة البيانات", list(database_fingerprints.keys()), key="db2")
+        if selected_fp:
+            try:
+                fp2_image = Image.open(database_fingerprints[selected_fp])
+                st.image(fp2_image, caption="البصمة الثانية", use_container_width=True)
+            except Exception as e:
+                st.error(f"خطأ في تحميل البصمة من قاعدة البيانات: {str(e)}")
 
 # زر بدء المعالجة
 if st.button("بدء المعالجة والمقارنة"):
