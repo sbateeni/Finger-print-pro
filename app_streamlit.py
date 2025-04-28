@@ -158,20 +158,34 @@ if compare_button and fingerprint1 and fingerprint2:
         with col1:
             st.markdown("#### البصمة الأولى")
             for metric, value in quality1.items():
-                st.markdown(f"""
-                <div class="quality-metric">
-                    <strong>{metric}:</strong> {value:.2f}
-                </div>
-                """, unsafe_allow_html=True)
+                if metric == 'resolution':
+                    st.markdown(f"""
+                    <div class="quality-metric">
+                        <strong>{metric}:</strong> {value}
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="quality-metric">
+                        <strong>{metric}:</strong> {float(value):.2f}
+                    </div>
+                    """, unsafe_allow_html=True)
         
         with col2:
             st.markdown("#### البصمة الثانية")
             for metric, value in quality2.items():
-                st.markdown(f"""
-                <div class="quality-metric">
-                    <strong>{metric}:</strong> {value:.2f}
-                </div>
-                """, unsafe_allow_html=True)
+                if metric == 'resolution':
+                    st.markdown(f"""
+                    <div class="quality-metric">
+                        <strong>{metric}:</strong> {value}
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div class="quality-metric">
+                        <strong>{metric}:</strong> {float(value):.2f}
+                    </div>
+                    """, unsafe_allow_html=True)
         
         # تحسين الصور
         status_text.text("جاري تحسين الصور...")
