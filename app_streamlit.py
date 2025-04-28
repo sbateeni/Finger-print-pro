@@ -7,7 +7,6 @@ import base64
 from fingerprint.preprocessor import preprocess_image
 from fingerprint.feature_extractor import extract_features, match_features
 from fingerprint.quality import calculate_quality
-import torch
 import gc
 
 # تعيين الحد الأقصى لحجم الصورة (بالبايت)
@@ -31,8 +30,6 @@ def process_image(image):
         
         # تنظيف الذاكرة
         gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
             
         return processed, features
         
