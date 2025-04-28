@@ -1,25 +1,6 @@
-# Core dependencies
-numpy>=1.26.4
-opencv-python-headless>=4.8.1.78  # Using headless version instead of opencv-python
-scikit-image>=0.22.0
-scikit-learn>=1.6.1
-scipy>=1.15.2
-matplotlib>=3.10.1
-seaborn>=0.13.2
-pandas>=2.2.3
-Pillow>=11.2.1
-psutil>=5.9.5
-
-# Web framework
-Flask>=2.0.1
-gunicorn>=20.1.0
-
-# System dependencies
-# Note: These need to be installed at the system level
-# apt-get update && apt-get install -y \
-#     libgl1-mesa-glx \
-#     libglib2.0-0 \
-#     libsm6 \
-#     libxext6 \
-#     libxrender-dev \
-#     libgl1-mesa-dev
+streamlit==1.32.0
+opencv-python==4.9.0.80
+numpy==1.26.4
+scikit-image==0.22.0
+matplotlib==3.8.3
+pillow==10.2.0 
