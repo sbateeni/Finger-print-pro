@@ -289,7 +289,7 @@ if compare_button and fingerprint1 and fingerprint2:
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.metric("نسبة التطابق", f"{match_result['score']:.2%}")
+            st.metric("نسبة التطابق", f"{float(match_result['score']):.2%}")
         
         with col2:
             st.metric("عدد النقاط المميزة في البصمة الأولى", features1['count'])
