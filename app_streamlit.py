@@ -255,8 +255,15 @@ if compare_button and fingerprint1 and fingerprint2:
         status_text.text("جاري معالجة الصور...")
         progress_bar.progress(30)
         
+        # تحويل الصور إلى numpy arrays
         processed_fp1 = preprocessor.preprocess_image(img1_path)
         processed_fp2 = preprocessor.preprocess_image(img2_path)
+        
+        # التأكد من أن الصور هي numpy arrays
+        if not isinstance(processed_fp1, np.ndarray):
+            processed_fp1 = np.array(processed_fp1)
+        if not isinstance(processed_fp2, np.ndarray):
+            processed_fp2 = np.array(processed_fp2)
         
         # استخراج المميزات
         status_text.text("جاري استخراج المميزات...")
