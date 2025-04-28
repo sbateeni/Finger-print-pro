@@ -3,7 +3,7 @@ import numpy as np
 from .feature_extractor import match_features
 from scipy.spatial.distance import cosine
 
-def match_fingerprints(features1, features2, threshold=0.5):
+def match_fingerprints(features1, features2, threshold=0.3):
     """
     مقارنة بصمتين وإرجاع نتيجة المطابقة
     
@@ -16,7 +16,7 @@ def match_fingerprints(features1, features2, threshold=0.5):
         dict: نتائج المطابقة
     """
     # التحقق من وجود مميزات كافية
-    if features1['count'] < 10 or features2['count'] < 10:
+    if features1['count'] < 5 or features2['count'] < 5:
         return {
             'is_match': False,
             'score': 0.0,
@@ -32,12 +32,22 @@ def match_fingerprints(features1, features2, threshold=0.5):
     # حساب درجة الثقة
     confidence_score = calculate_confidence_score(features1, features2, match_result)
     
+    # حساب درجة التشابه
+    similarity_score = calculate_similarity_score(features1, features2)
+    
     # تحديد نتيجة المطابقة
-    is_match = match_result['score'] >= threshold and confidence_score >= 0.6
+    is_match = (match_result['score'] >= threshold and 
+               confidence_score >= 0.4 and 
+               similarity_score >= 0.3)
+    
+    # حساب النتيجة النهائية
+    final_score = (match_result['score'] * 0.4 + 
+                  confidence_score * 0.3 + 
+                  similarity_score * 0.3)
     
     return {
         'is_match': is_match,
-        'score': match_result['score'],
+        'score': final_score * 100,  # تحويل إلى نسبة مئوية
         'matches': match_result['matches'],
         'match_count': match_result['count'],
         'threshold': threshold,
@@ -69,7 +79,7 @@ def calculate_confidence_score(features1, features2, match_result):
     type_consistency = type_consistency / match_result['count'] if match_result['count'] > 0 else 0
     
     # حساب درجة الثقة النهائية
-    confidence = (match_ratio * 0.7 + type_consistency * 0.3)
+    confidence = (match_ratio * 0.6 + type_consistency * 0.4)
     
     return confidence
 
@@ -92,11 +102,11 @@ def calculate_similarity_score(features1, features2):
     
     # تطبيق معامل التصحيح
     if match_result['count'] < 10:
-        similarity_score *= 0.5
+        similarity_score *= 0.7  # تخفيف العقوبة
     
     return similarity_score
 
-def find_best_match(query_features, database_features, threshold=0.5):
+def find_best_match(query_features, database_features, threshold=0.3):
     """
     البحث عن أفضل تطابق في قاعدة البيانات
     
@@ -139,7 +149,13 @@ def extract_features(image):
         numpy.ndarray: مصفوفة المميزات
     """
     # استخدام SIFT لاستخراج النقاط المميزة
-    sift = cv2.SIFT_create()
+    sift = cv2.SIFT_create(
+        nfeatures=0,  # عدد غير محدود من النقاط المميزة
+        nOctaveLayers=3,
+        contrastThreshold=0.04,
+        edgeThreshold=10,
+        sigma=1.6
+    )
     keypoints, descriptors = sift.detectAndCompute(image, None)
     
     if descriptors is None:

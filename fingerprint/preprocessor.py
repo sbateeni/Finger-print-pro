@@ -1,9 +1,41 @@
 import cv2
 import numpy as np
+import platform
+import psutil
+import torch
+import gc
+
+def get_device_info():
+    """
+    الحصول على معلومات الجهاز وتحديد أفضل إعدادات المعالجة
+    """
+    device_info = {
+        'cpu_count': psutil.cpu_count(),
+        'memory': psutil.virtual_memory().total,
+        'gpu_available': torch.cuda.is_available(),
+        'platform': platform.system(),
+        'processor': platform.processor()
+    }
+    
+    # تحديد إعدادات المعالجة بناءً على موارد النظام
+    if device_info['gpu_available']:
+        device_info['use_gpu'] = True
+        device_info['batch_size'] = 32
+    else:
+        device_info['use_gpu'] = False
+        device_info['batch_size'] = 8
+    
+    # تعديل حجم الصور بناءً على الذاكرة المتاحة
+    if device_info['memory'] < 4 * 1024 * 1024 * 1024:  # أقل من 4GB
+        device_info['max_image_size'] = (800, 800)
+    else:
+        device_info['max_image_size'] = (1024, 1024)
+    
+    return device_info
 
 def preprocess_image(image):
     """
-    معالجة الصورة المسبقة للبصمة
+    معالجة الصورة المسبقة للبصمة مع تحسينات الأداء
     
     Args:
         image (numpy.ndarray): صورة البصمة
@@ -11,33 +43,53 @@ def preprocess_image(image):
     Returns:
         numpy.ndarray: الصورة المعالجة
     """
+    device_info = get_device_info()
+    
     # تحويل الصورة إلى تدرج الرمادي
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     else:
         gray = image.copy()
     
-    # تحسين التباين باستخدام CLAHE
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    # تغيير حجم الصورة إذا كانت كبيرة جداً
+    if gray.shape[0] > device_info['max_image_size'][0] or gray.shape[1] > device_info['max_image_size'][1]:
+        scale = min(device_info['max_image_size'][0] / gray.shape[0],
+                   device_info['max_image_size'][1] / gray.shape[1])
+        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    
+    # تحسين التباين باستخدام CLAHE مع معلمات محسنة
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
     enhanced = clahe.apply(gray)
     
-    # إزالة الضوضاء باستخدام Non-local Means Denoising
-    denoised = cv2.fastNlMeansDenoising(enhanced, None, 10, 7, 21)
+    # إزالة الضوضاء باستخدام Bilateral Filter للحفاظ على الحواف
+    denoised = cv2.bilateralFilter(enhanced, 9, 75, 75)
     
-    # تحسين الحواف باستخدام Canny
-    edges = cv2.Canny(denoised, 100, 200)
+    # تحسين الحواف باستخدام Canny مع معلمات محسنة
+    edges = cv2.Canny(denoised, 50, 150)
     
     # تطبيق مرشح Gaussian لإزالة الضوضاء المتبقية
     blurred = cv2.GaussianBlur(denoised, (5, 5), 0)
     
-    # تحسين التباين مرة أخرى
+    # تحسين التباين مرة أخرى باستخدام CLAHE
     enhanced_final = clahe.apply(blurred)
     
-    return enhanced_final
+    # تطبيق عمليات مورفولوجية لتحسين جودة البصمة
+    kernel = np.ones((3,3), np.uint8)
+    dilated = cv2.dilate(enhanced_final, kernel, iterations=1)
+    eroded = cv2.erode(dilated, kernel, iterations=1)
+    
+    # تطبيق Adaptive Thresholding
+    binary = cv2.adaptiveThreshold(eroded, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                 cv2.THRESH_BINARY, 11, 2)
+    
+    # تنظيف الذاكرة
+    gc.collect()
+    
+    return binary
 
 def enhance_image_quality(image):
     """
-    تحسين جودة الصورة
+    تحسين جودة الصورة مع تحسينات الأداء
     
     Args:
         image (numpy.ndarray): صورة البصمة
@@ -45,23 +97,31 @@ def enhance_image_quality(image):
     Returns:
         dict: قاموس يحتوي على الصور في مراحل المعالجة المختلفة
     """
+    device_info = get_device_info()
+    
     # تحويل إلى تدرج الرمادي
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     else:
         gray = image.copy()
     
+    # تغيير حجم الصورة إذا كانت كبيرة جداً
+    if gray.shape[0] > device_info['max_image_size'][0] or gray.shape[1] > device_info['max_image_size'][1]:
+        scale = min(device_info['max_image_size'][0] / gray.shape[0],
+                   device_info['max_image_size'][1] / gray.shape[1])
+        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    
     # تحسين التباين باستخدام CLAHE
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
     enhanced = clahe.apply(gray)
     
-    # إزالة الضوضاء باستخدام Non-local Means Denoising
-    denoised = cv2.fastNlMeansDenoising(enhanced, None, 10, 7, 21)
+    # إزالة الضوضاء باستخدام Bilateral Filter
+    denoised = cv2.bilateralFilter(enhanced, 9, 75, 75)
     
     # تحسين الحواف باستخدام Canny
-    edges = cv2.Canny(denoised, 100, 200)
+    edges = cv2.Canny(denoised, 50, 150)
     
-    # تطبيق مرشح Gaussian لإزالة الضوضاء المتبقية
+    # تطبيق مرشح Gaussian
     blurred = cv2.GaussianBlur(denoised, (5, 5), 0)
     
     # تحسين التباين مرة أخرى
@@ -78,6 +138,9 @@ def enhance_image_quality(image):
     else:
         final = enhanced_final
     
+    # تنظيف الذاكرة
+    gc.collect()
+    
     return {
         'original': image,
         'gray': gray,
@@ -89,7 +152,7 @@ def enhance_image_quality(image):
 
 def check_image_quality(image):
     """
-    فحص جودة الصورة
+    فحص جودة الصورة مع تحسينات الأداء
     
     Args:
         image (numpy.ndarray): صورة البصمة
@@ -97,10 +160,18 @@ def check_image_quality(image):
     Returns:
         dict: قاموس يحتوي على مقاييس جودة الصورة
     """
+    device_info = get_device_info()
+    
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     else:
         gray = image.copy()
+    
+    # تغيير حجم الصورة إذا كانت كبيرة جداً
+    if gray.shape[0] > device_info['max_image_size'][0] or gray.shape[1] > device_info['max_image_size'][1]:
+        scale = min(device_info['max_image_size'][0] / gray.shape[0],
+                   device_info['max_image_size'][1] / gray.shape[1])
+        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
     
     # حساب مقاييس الجودة
     quality_metrics = {
@@ -110,14 +181,18 @@ def check_image_quality(image):
         'contrast': np.std(gray),
         'noise_ratio': cv2.meanStdDev(gray)[1][0][0] / cv2.meanStdDev(gray)[0][0][0],
         'sharpness': cv2.Laplacian(gray, cv2.CV_64F).var(),
-        'entropy': -np.sum(np.histogram(gray, bins=256)[0] * np.log2(np.histogram(gray, bins=256)[0] + 1e-10))
+        'entropy': -np.sum(np.histogram(gray, bins=256)[0] * np.log2(np.histogram(gray, bins=256)[0] + 1e-10)),
+        'device_info': device_info
     }
+    
+    # تنظيف الذاكرة
+    gc.collect()
     
     return quality_metrics
 
 def preprocess_fingerprint(image):
     """
-    معالجة صورة البصمة وتحسين جودتها
+    معالجة صورة البصمة وتحسين جودتها مع تحسينات الأداء
     
     Args:
         image (numpy.ndarray): صورة البصمة
@@ -125,25 +200,40 @@ def preprocess_fingerprint(image):
     Returns:
         numpy.ndarray: صورة البصمة المعالجة
     """
+    device_info = get_device_info()
+    
     # تحويل الصورة إلى تدرج رمادي
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     else:
         gray = image
     
+    # تغيير حجم الصورة إذا كانت كبيرة جداً
+    if gray.shape[0] > device_info['max_image_size'][0] or gray.shape[1] > device_info['max_image_size'][1]:
+        scale = min(device_info['max_image_size'][0] / gray.shape[0],
+                   device_info['max_image_size'][1] / gray.shape[1])
+        gray = cv2.resize(gray, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    
     # تحسين التباين باستخدام CLAHE
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
     enhanced = clahe.apply(gray)
     
-    # تطبيق فلتر Gaussian لإزالة الضوضاء
-    blurred = cv2.GaussianBlur(enhanced, (5,5), 0)
+    # تطبيق فلتر Bilateral
+    denoised = cv2.bilateralFilter(enhanced, 9, 75, 75)
     
     # تحسين الحواف باستخدام Canny
-    edges = cv2.Canny(blurred, 100, 200)
+    edges = cv2.Canny(denoised, 50, 150)
     
-    # تطبيق عمليات مورفولوجية لتحسين جودة البصمة
+    # تطبيق عمليات مورفولوجية
     kernel = np.ones((3,3), np.uint8)
     dilated = cv2.dilate(edges, kernel, iterations=1)
     eroded = cv2.erode(dilated, kernel, iterations=1)
     
-    return eroded 
+    # تطبيق Adaptive Thresholding
+    binary = cv2.adaptiveThreshold(eroded, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                 cv2.THRESH_BINARY, 11, 2)
+    
+    # تنظيف الذاكرة
+    gc.collect()
+    
+    return binary 

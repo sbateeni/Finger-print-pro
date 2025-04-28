@@ -1,9 +1,12 @@
 import cv2
 import numpy as np
+import torch
+import gc
+from .preprocessor import get_device_info
 
 def extract_features(image):
     """
-    استخراج المميزات من صورة البصمة
+    استخراج المميزات من صورة البصمة مع تحسينات الأداء
     
     Args:
         image (numpy.ndarray): صورة البصمة المعالجة
@@ -11,20 +14,40 @@ def extract_features(image):
     Returns:
         dict: قاموس يحتوي على المميزات المستخرجة
     """
-    # إنشاء كائن SIFT مع معلمات محسنة
+    device_info = get_device_info()
+    
+    # إنشاء كائنات المستخرجين
     sift = cv2.SIFT_create(
-        nfeatures=0,  # عدد غير محدود من النقاط المميزة
+        nfeatures=0,
         nOctaveLayers=3,
         contrastThreshold=0.04,
         edgeThreshold=10,
         sigma=1.6
     )
     
-    # استخراج النقاط المميزة والوصف
-    keypoints, descriptors = sift.detectAndCompute(image, None)
+    orb = cv2.ORB_create(
+        nfeatures=1000,
+        scaleFactor=1.2,
+        nlevels=8,
+        edgeThreshold=31,
+        firstLevel=0,
+        WTA_K=2,
+        patchSize=31,
+        fastThreshold=20
+    )
+    
+    # استخراج النقاط المميزة والوصف باستخدام SIFT
+    sift_keypoints, sift_descriptors = sift.detectAndCompute(image, None)
+    
+    # استخراج النقاط المميزة والوصف باستخدام ORB
+    orb_keypoints, orb_descriptors = orb.detectAndCompute(image, None)
+    
+    # دمج النقاط المميزة والوصف
+    keypoints = sift_keypoints + orb_keypoints
+    descriptors = np.vstack([sift_descriptors, orb_descriptors]) if sift_descriptors is not None and orb_descriptors is not None else None
     
     # تصفية النقاط المميزة حسب الجودة
-    if len(keypoints) > 0:
+    if len(keypoints) > 0 and descriptors is not None:
         # حساب قوة النقاط المميزة
         strengths = [kp.response for kp in keypoints]
         threshold = np.mean(strengths) * 0.5
@@ -46,6 +69,9 @@ def extract_features(image):
     # تصنيف النقاط المميزة
     minutiae_types = classify_minutiae(image, keypoints)
     
+    # تنظيف الذاكرة
+    gc.collect()
+    
     return {
         'keypoints': keypoints,
         'descriptors': descriptors,
@@ -56,7 +82,7 @@ def extract_features(image):
 
 def classify_minutiae(image, keypoints):
     """
-    تصنيف النقاط المميزة في البصمة
+    تصنيف النقاط المميزة في البصمة مع تحسينات الأداء
     
     Args:
         image (numpy.ndarray): صورة البصمة
@@ -65,6 +91,7 @@ def classify_minutiae(image, keypoints):
     Returns:
         list: قائمة تحتوي على أنواع النقاط المميزة
     """
+    device_info = get_device_info()
     minutiae_types = []
     
     for kp in keypoints:
@@ -101,7 +128,7 @@ def classify_minutiae(image, keypoints):
 
 def match_features(features1, features2):
     """
-    مقارنة المميزات بين بصمتين
+    مقارنة المميزات بين بصمتين مع تحسينات الأداء
     
     Args:
         features1 (dict): مميزات البصمة الأولى
@@ -110,6 +137,8 @@ def match_features(features1, features2):
     Returns:
         dict: نتائج المقارنة
     """
+    device_info = get_device_info()
+    
     # التحقق من وجود واصفات كافية
     if features1['descriptors'] is None or features2['descriptors'] is None:
         return {
@@ -118,20 +147,28 @@ def match_features(features1, features2):
             'count': 0
         }
     
-    # إنشاء كائن FLANN matcher مع معلمات محسنة
+    # إنشاء كائنات المطابقة
     FLANN_INDEX_KDTREE = 1
     index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
     search_params = dict(checks=50)
     flann = cv2.FlannBasedMatcher(index_params, search_params)
     
-    # مقارنة الواصفات
-    matches = flann.knnMatch(features1['descriptors'], features2['descriptors'], k=2)
+    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+    
+    # مقارنة الواصفات باستخدام FLANN
+    flann_matches = flann.knnMatch(features1['descriptors'], features2['descriptors'], k=2)
+    
+    # مقارنة الواصفات باستخدام BF
+    bf_matches = bf.match(features1['descriptors'], features2['descriptors'])
     
     # تطبيق نسبة Lowe's ratio test مع عتبة متغيرة
     good_matches = []
-    for m, n in matches:
+    for m, n in flann_matches:
         if m.distance < 0.7 * n.distance:
             good_matches.append(m)
+    
+    # إضافة التطابقات الجيدة من BF
+    good_matches.extend([m for m in bf_matches if m.distance < 50])
     
     # حساب نسبة التطابق
     min_features = min(len(features1['keypoints']), len(features2['keypoints']))
@@ -139,6 +176,9 @@ def match_features(features1, features2):
         match_score = len(good_matches) / min_features
     else:
         match_score = 0.0
+    
+    # تنظيف الذاكرة
+    gc.collect()
     
     return {
         'matches': [(m.queryIdx, m.trainIdx) for m in good_matches],
