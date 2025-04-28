@@ -5,62 +5,41 @@ import gc
 from .preprocessor import get_device_info
 
 def extract_features(image):
-    """
-    استخراج المميزات من صورة البصمة مع تحسينات الأداء
-    
-    Args:
-        image (numpy.ndarray): صورة البصمة المعالجة
+    """Extract features from fingerprint image using both SIFT and ORB"""
+    try:
+        # Get device info for optimization
+        device_info = get_device_info()
         
-    Returns:
-        dict: قاموس يحتوي على المميزات المستخرجة
-    """
-    device_info = get_device_info()
-    
-    # إنشاء كائن SIFT
-    sift = cv2.SIFT_create(
-        nfeatures=0,
-        nOctaveLayers=3,
-        contrastThreshold=0.04,
-        edgeThreshold=10,
-        sigma=1.6
-    )
-    
-    # استخراج النقاط المميزة والوصف باستخدام SIFT
-    keypoints, descriptors = sift.detectAndCompute(image, None)
-    
-    # تصفية النقاط المميزة حسب الجودة
-    if len(keypoints) > 0 and descriptors is not None:
-        # حساب قوة النقاط المميزة
-        strengths = [kp.response for kp in keypoints]
-        threshold = np.mean(strengths) * 0.5
+        # Initialize feature detectors
+        sift = cv2.SIFT_create()
+        orb = cv2.ORB_create()
         
-        # تصفية النقاط المميزة
-        filtered_keypoints = []
-        filtered_descriptors = []
-        for kp, desc in zip(keypoints, descriptors):
-            if kp.response > threshold:
-                filtered_keypoints.append(kp)
-                filtered_descriptors.append(desc)
+        # Extract features using both detectors
+        sift_kp, sift_desc = sift.detectAndCompute(image, None)
+        orb_kp, orb_desc = orb.detectAndCompute(image, None)
         
-        keypoints = filtered_keypoints
-        descriptors = np.array(filtered_descriptors) if filtered_descriptors else None
-    
-    # استخراج إحداثيات النقاط المميزة
-    minutiae = np.array([[kp.pt[0], kp.pt[1]] for kp in keypoints]) if keypoints else np.array([])
-    
-    # تصنيف النقاط المميزة
-    minutiae_types = classify_minutiae(image, keypoints)
-    
-    # تنظيف الذاكرة
-    gc.collect()
-    
-    return {
-        'keypoints': keypoints,
-        'descriptors': descriptors,
-        'minutiae': minutiae,
-        'minutiae_types': minutiae_types,
-        'count': len(keypoints)
-    }
+        # Merge keypoints and descriptors
+        keypoints = sift_kp + orb_kp
+        descriptors = np.vstack([sift_desc, orb_desc]) if sift_desc is not None and orb_desc is not None else None
+        
+        # Filter keypoints based on strength
+        if descriptors is not None:
+            strength = np.linalg.norm(descriptors, axis=1)
+            threshold = np.mean(strength) + np.std(strength)
+            strong_indices = strength > threshold
+            keypoints = [kp for i, kp in enumerate(keypoints) if strong_indices[i]]
+            descriptors = descriptors[strong_indices]
+        
+        # Clean up memory
+        gc.collect()
+        if device_info['cuda_available']:
+            torch.cuda.empty_cache()
+            
+        return keypoints, descriptors
+        
+    except Exception as e:
+        print(f"Error in feature extraction: {str(e)}")
+        return None, None
 
 def classify_minutiae(image, keypoints):
     """
