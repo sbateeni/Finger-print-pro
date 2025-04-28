@@ -107,10 +107,21 @@ class FeatureExtractor:
                     if len(filtered_minutiae) < self.min_minutiae:
                         raise ValueError(f"لم يتم العثور على نقاط مميزة كافية. تم العثور على {len(filtered_minutiae)} نقطة فقط.")
             
+            # تحويل النقاط المميزة إلى القالب المطلوب
+            minutiae_list = []
+            for point, score in zip(filtered_minutiae, filtered_scores):
+                x, y, point_type, angle = point
+                minutiae_list.append({
+                    'x': int(x),
+                    'y': int(y),
+                    'type': point_type,
+                    'angle': float(angle),
+                    'quality': float(score)
+                })
+            
             return {
-                'minutiae': filtered_minutiae,
-                'quality_scores': filtered_scores,
-                'count': len(filtered_minutiae)
+                'minutiae': minutiae_list,
+                'count': len(minutiae_list)
             }
             
         except Exception as e:

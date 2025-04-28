@@ -618,7 +618,10 @@ class FingerprintMatcher:
         """مطابقة المميزات بين صورتين"""
         try:
             # التحقق من وجود نقاط كافية
-            if features1['count'] < self.min_points or features2['count'] < self.min_points:
+            count1 = len(features1['minutiae'])
+            count2 = len(features2['minutiae'])
+            
+            if count1 < self.min_points or count2 < self.min_points:
                 raise ValueError("لا توجد نقاط مميزة كافية في إحدى الصورتين")
             
             # استخراج النقاط المميزة
@@ -632,13 +635,13 @@ class FingerprintMatcher:
             matches = self._match_minutiae(distances)
             
             # حساب درجة التطابق
-            score = self._calculate_score(matches, features1['count'], features2['count'])
+            score = self._calculate_score(matches, count1, count2)
             
             return {
                 'score': score,
                 'matches': matches,
-                'count1': features1['count'],
-                'count2': features2['count']
+                'count1': count1,
+                'count2': count2
             }
             
         except Exception as e:
