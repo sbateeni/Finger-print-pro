@@ -111,10 +111,10 @@ if st.button("بدء المعالجة والمقارنة"):
             col1, col2 = st.columns(2)
             with col1:
                 st.subheader("جودة البصمة الأولى")
-                st.plotly_chart(plot_quality_metrics(fp1_quality))
+                st.plotly_chart(plot_quality_metrics(fp1_quality), key="quality_chart1")
             with col2:
                 st.subheader("جودة البصمة الثانية")
-                st.plotly_chart(plot_quality_metrics(fp2_quality))
+                st.plotly_chart(plot_quality_metrics(fp2_quality), key="quality_chart2")
             
             # عرض النقاط المميزة
             st.subheader("النقاط المميزة")
