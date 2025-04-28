@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
 
 def visualize_features(image, features):
     """
@@ -106,43 +106,38 @@ def visualize_matching(img1, img2, features1, features2, match_result):
 
 def plot_quality_metrics(metrics):
     """
-    رسم مقاييس جودة الصورة
+    رسم مقاييس جودة الصورة باستخدام Plotly
     
     Args:
         metrics (dict): مقاييس جودة الصورة
         
     Returns:
-        matplotlib.figure.Figure: الرسم البياني
+        plotly.graph_objects.Figure: الرسم البياني
     """
-    # إنشاء الرسم البياني
-    fig, ax = plt.subplots(figsize=(10, 6))
-    
     # استخراج القيم
     labels = list(metrics.keys())
     values = [float(v) if isinstance(v, (int, float)) else 0 for v in metrics.values()]
     
-    # رسم الأعمدة
-    bars = ax.bar(labels, values)
+    # إنشاء الرسم البياني
+    fig = go.Figure(data=[
+        go.Bar(
+            x=labels,
+            y=values,
+            text=[f'{v:.2f}' for v in values],
+            textposition='auto',
+            marker_color=['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2']
+        )
+    ])
     
     # تخصيص الرسم
-    ax.set_title('مقاييس جودة الصورة')
-    ax.set_ylabel('القيمة')
-    plt.xticks(rotation=45)
+    fig.update_layout(
+        title='مقاييس جودة الصورة',
+        xaxis_title='المقياس',
+        yaxis_title='القيمة',
+        xaxis_tickangle=45,
+        template='plotly_white',
+        height=400,
+        margin=dict(l=50, r=50, t=50, b=100)
+    )
     
-    # إضافة القيم على الأعمدة
-    for bar in bars:
-        height = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width()/2., height,
-                f'{height:.2f}',
-                ha='center', va='bottom')
-    
-    # إضافة خطوط الشبكة
-    ax.grid(True, linestyle='--', alpha=0.7)
-    
-    # تخصيص الألوان
-    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2']
-    for bar, color in zip(bars, colors):
-        bar.set_color(color)
-    
-    plt.tight_layout()
     return fig 
