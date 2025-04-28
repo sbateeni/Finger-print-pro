@@ -3,227 +3,191 @@ import cv2
 import numpy as np
 from PIL import Image
 import io
-import os
+import base64
 from fingerprint.preprocessor import preprocess_image, enhance_image_quality, check_image_quality
 from fingerprint.feature_extractor import extract_features
 from fingerprint.matcher import match_fingerprints
 from fingerprint.visualization import visualize_features, visualize_matching, plot_quality_metrics
 
-# إعداد الصفحة
+# تكوين الصفحة
 st.set_page_config(
-    page_title="نظام مطابقة البصمات",
+    page_title="نظام مقارنة البصمات",
     page_icon="👆",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
-# تخصيص التصميم
+# تنسيق CSS مخصص
 st.markdown("""
     <style>
-        .stApp {
-            direction: rtl;
-        }
-        .upload-section {
-            background-color: #f0f2f6;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 10px 0;
-        }
-        .result-section {
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 10px;
-            margin: 10px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
+    .main {
+        background-color: #f8f9fa;
+    }
+    .stApp {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+    .title-text {
+        color: #2c3e50;
+        font-size: 2.5rem;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    .upload-box {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-bottom: 2rem;
+    }
+    .result-box {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        margin-top: 2rem;
+    }
+    .quality-score {
+        font-size: 1.2rem;
+        color: #2c3e50;
+        margin-bottom: 1rem;
+    }
+    .match-score {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #27ae60;
+        margin: 1rem 0;
+    }
+    .match-result {
+        font-size: 1.2rem;
+        font-weight: bold;
+        text-align: center;
+        padding: 1rem;
+        border-radius: 10px;
+        margin-top: 1rem;
+    }
+    .match-result.match {
+        background-color: #2ecc71;
+        color: white;
+    }
+    .match-result.no-match {
+        background-color: #e74c3c;
+        color: white;
+    }
+    .stButton>button {
+        width: 100%;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        padding: 1rem;
+        border-radius: 10px;
+        font-weight: bold;
+        transition: background-color 0.3s;
+    }
+    .stButton>button:hover {
+        background-color: #2980b9;
+    }
+    .image-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin: 1rem 0;
+    }
+    .image-container img {
+        max-width: 100%;
+        height: auto;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
     </style>
 """, unsafe_allow_html=True)
 
 # العنوان الرئيسي
-st.title("👆 نظام مطابقة البصمات")
+st.markdown('<h1 class="title-text">نظام مقارنة البصمات</h1>', unsafe_allow_html=True)
 
-# قسم تحميل البصمات
-st.header("تحميل البصمات")
+# تقسيم الصفحة إلى أعمدة
 col1, col2 = st.columns(2)
 
 with col1:
-    st.subheader("البصمة الأولى")
-    capture_method = st.radio("طريقة إدخال البصمة الأولى", ["تحميل ملف", "التقاط صورة", "قاعدة البيانات"], key="method1")
-    if capture_method == "تحميل ملف":
-        fp1_file = st.file_uploader("اختر البصمة الأولى", type=['png', 'jpg', 'jpeg'], key="fp1")
-        if fp1_file:
-            try:
-                fp1_image = Image.open(fp1_file)
-                st.image(fp1_image, caption="البصمة الأولى", use_container_width=True)
-            except Exception as e:
-                st.error(f"خطأ في تحميل الصورة: {str(e)}")
-    elif capture_method == "التقاط صورة":
-        fp1_camera = st.camera_input("التقاط صورة البصمة الأولى", key="camera1")
-        if fp1_camera:
-            try:
-                fp1_image = Image.open(fp1_camera)
-                st.image(fp1_image, caption="البصمة الأولى", use_container_width=True)
-            except Exception as e:
-                st.error(f"خطأ في التقاط الصورة: {str(e)}")
-    else:
-        # قائمة البصمات في قاعدة البيانات
-        database_fingerprints = {
-            "بصمة 1": "fingerprints/fp1.jpg",
-            "بصمة 2": "fingerprints/fp2.jpg",
-            "بصمة 3": "fingerprints/fp3.jpg"
-        }
-        selected_fp = st.selectbox("اختر البصمة من قاعدة البيانات", list(database_fingerprints.keys()), key="db1")
-        if selected_fp:
-            try:
-                fp1_image = Image.open(database_fingerprints[selected_fp])
-                st.image(fp1_image, caption="البصمة الأولى", use_container_width=True)
-            except Exception as e:
-                st.error(f"خطأ في تحميل البصمة من قاعدة البيانات: {str(e)}")
+    st.markdown('<div class="upload-box">', unsafe_allow_html=True)
+    st.markdown("### البصمة الأولى")
+    fp1_file = st.file_uploader("اختر صورة البصمة الأولى", type=['png', 'jpg', 'jpeg'], key="fp1")
+    if fp1_file:
+        fp1_image = Image.open(fp1_file)
+        st.markdown('<div class="image-container">', unsafe_allow_html=True)
+        st.image(fp1_image, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 with col2:
-    st.subheader("البصمة الثانية")
-    capture_method = st.radio("طريقة إدخال البصمة الثانية", ["تحميل ملف", "التقاط صورة", "قاعدة البيانات"], key="method2")
-    if capture_method == "تحميل ملف":
-        fp2_file = st.file_uploader("اختر البصمة الثانية", type=['png', 'jpg', 'jpeg'], key="fp2")
-        if fp2_file:
-            try:
-                fp2_image = Image.open(fp2_file)
-                st.image(fp2_image, caption="البصمة الثانية", use_container_width=True)
-            except Exception as e:
-                st.error(f"خطأ في تحميل الصورة: {str(e)}")
-    elif capture_method == "التقاط صورة":
-        fp2_camera = st.camera_input("التقاط صورة البصمة الثانية", key="camera2")
-        if fp2_camera:
-            try:
-                fp2_image = Image.open(fp2_camera)
-                st.image(fp2_image, caption="البصمة الثانية", use_container_width=True)
-            except Exception as e:
-                st.error(f"خطأ في التقاط الصورة: {str(e)}")
-    else:
-        # قائمة البصمات في قاعدة البيانات
-        database_fingerprints = {
-            "بصمة 1": "fingerprints/fp1.jpg",
-            "بصمة 2": "fingerprints/fp2.jpg",
-            "بصمة 3": "fingerprints/fp3.jpg"
-        }
-        selected_fp = st.selectbox("اختر البصمة من قاعدة البيانات", list(database_fingerprints.keys()), key="db2")
-        if selected_fp:
-            try:
-                fp2_image = Image.open(database_fingerprints[selected_fp])
-                st.image(fp2_image, caption="البصمة الثانية", use_container_width=True)
-            except Exception as e:
-                st.error(f"خطأ في تحميل البصمة من قاعدة البيانات: {str(e)}")
+    st.markdown('<div class="upload-box">', unsafe_allow_html=True)
+    st.markdown("### البصمة الثانية")
+    fp2_file = st.file_uploader("اختر صورة البصمة الثانية", type=['png', 'jpg', 'jpeg'], key="fp2")
+    if fp2_file:
+        fp2_image = Image.open(fp2_file)
+        st.markdown('<div class="image-container">', unsafe_allow_html=True)
+        st.image(fp2_image, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# زر بدء المعالجة
-if st.button("بدء المعالجة والمقارنة"):
+# زر المقارنة
+if st.button("مقارنة البصمات", key="compare"):
     if fp1_file and fp2_file:
-        try:
+        with st.spinner("جاري معالجة البصمات..."):
             # تحويل الصور إلى مصفوفات NumPy
-            fp1_array = np.array(fp1_image)
-            fp2_array = np.array(fp2_image)
-            
-            # إنشاء شريط تقدم
-            progress_bar = st.progress(0)
+            fp1_array = np.array(Image.open(fp1_file))
+            fp2_array = np.array(Image.open(fp2_file))
             
             # معالجة البصمات
-            with st.spinner("جاري معالجة البصمات..."):
-                # تحسين جودة الصور
-                fp1_enhanced = enhance_image_quality(fp1_array)
-                fp2_enhanced = enhance_image_quality(fp2_array)
-                progress_bar.progress(20)
-                
-                # فحص جودة الصور
-                fp1_quality = check_image_quality(fp1_enhanced['final'])
-                fp2_quality = check_image_quality(fp2_enhanced['final'])
-                progress_bar.progress(40)
-                
-                # استخراج المميزات
-                fp1_features = extract_features(fp1_enhanced['final'])
-                fp2_features = extract_features(fp2_enhanced['final'])
-                progress_bar.progress(60)
-                
-                # مقارنة البصمات
-                match_result = match_fingerprints(fp1_features, fp2_features)
-                progress_bar.progress(80)
-                
-                # تصور النتائج
-                fp1_vis = visualize_features(fp1_enhanced['final'], fp1_features)
-                fp2_vis = visualize_features(fp2_enhanced['final'], fp2_features)
-                matching_vis = visualize_matching(fp1_enhanced['final'], fp2_enhanced['final'],
-                                               fp1_features, fp2_features, match_result)
-                progress_bar.progress(100)
+            fp1_processed = preprocess_image(fp1_array)
+            fp2_processed = preprocess_image(fp2_array)
+            
+            # استخراج المميزات
+            fp1_features = extract_features(fp1_processed)
+            fp2_features = extract_features(fp2_processed)
+            
+            # مقارنة البصمات
+            match_result = match_fingerprints(fp1_features, fp2_features)
+            
+            # تصور النتائج
+            fp1_vis = visualize_features(fp1_processed, fp1_features)
+            fp2_vis = visualize_features(fp2_processed, fp2_features)
+            matching_vis = visualize_matching(fp1_processed, fp2_processed, fp1_features, fp2_features, match_result)
             
             # عرض النتائج
-            st.header("نتائج المعالجة")
+            st.markdown('<div class="result-box">', unsafe_allow_html=True)
+            st.markdown("### نتائج المقارنة")
             
-            # عرض مقاييس الجودة
+            # عرض الصور المعالجة
             col1, col2 = st.columns(2)
             with col1:
-                st.subheader("جودة البصمة الأولى")
-                st.plotly_chart(plot_quality_metrics(fp1_quality), key="quality_chart1")
-            with col2:
-                st.subheader("جودة البصمة الثانية")
-                st.plotly_chart(plot_quality_metrics(fp2_quality), key="quality_chart2")
+                st.markdown('<div class="image-container">', unsafe_allow_html=True)
+                st.image(fp1_vis, caption="البصمة الأولى بعد المعالجة", use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
             
-            # عرض النقاط المميزة
-            st.subheader("النقاط المميزة")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.image(fp1_vis, caption="النقاط المميزة - البصمة الأولى", use_container_width=True)
-                # إحصائيات النقاط المميزة للبصمة الأولى
-                minutiae_counts = {
-                    'ridge_ending': sum(1 for t in fp1_features['minutiae_types'] if t == 'ridge_ending'),
-                    'bifurcation': sum(1 for t in fp1_features['minutiae_types'] if t == 'bifurcation'),
-                    'unknown': sum(1 for t in fp1_features['minutiae_types'] if t == 'unknown')
-                }
-                st.markdown("""
-                #### إحصائيات النقاط المميزة - البصمة الأولى
-                - 🔴 نقاط نهاية الخطوط (أحمر): {}
-                - 🟢 نقاط التفرع (أخضر): {}
-                - 🔵 نقاط غير معروفة (أزرق): {}
-                - 📊 إجمالي النقاط: {}
-                """.format(
-                    minutiae_counts['ridge_ending'],
-                    minutiae_counts['bifurcation'],
-                    minutiae_counts['unknown'],
-                    len(fp1_features['minutiae_types'])
-                ))
             with col2:
-                st.image(fp2_vis, caption="النقاط المميزة - البصمة الثانية", use_container_width=True)
-                # إحصائيات النقاط المميزة للبصمة الثانية
-                minutiae_counts = {
-                    'ridge_ending': sum(1 for t in fp2_features['minutiae_types'] if t == 'ridge_ending'),
-                    'bifurcation': sum(1 for t in fp2_features['minutiae_types'] if t == 'bifurcation'),
-                    'unknown': sum(1 for t in fp2_features['minutiae_types'] if t == 'unknown')
-                }
-                st.markdown("""
-                #### إحصائيات النقاط المميزة - البصمة الثانية
-                - 🔴 نقاط نهاية الخطوط (أحمر): {}
-                - 🟢 نقاط التفرع (أخضر): {}
-                - 🔵 نقاط غير معروفة (أزرق): {}
-                - 📊 إجمالي النقاط: {}
-                """.format(
-                    minutiae_counts['ridge_ending'],
-                    minutiae_counts['bifurcation'],
-                    minutiae_counts['unknown'],
-                    len(fp2_features['minutiae_types'])
-                ))
+                st.markdown('<div class="image-container">', unsafe_allow_html=True)
+                st.image(fp2_vis, caption="البصمة الثانية بعد المعالجة", use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
             
-            # عرض نتيجة المطابقة
-            st.subheader("نتيجة المطابقة")
+            # عرض صورة المقارنة
+            st.markdown('<div class="image-container">', unsafe_allow_html=True)
             st.image(matching_vis, caption="تمثيل بصري للتطابق بين البصمتين", use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
             
-            # عرض إحصائيات المطابقة
-            st.markdown(f"""
-            ### إحصائيات المطابقة
-            - نسبة التطابق: {match_result['score']:.2%}
-            - عدد النقاط المتطابقة: {match_result['match_count']}
-            - النتيجة: {'تطابق' if match_result['is_match'] else 'عدم تطابق'}
-            """)
+            # عرض نتيجة المقارنة
+            st.markdown(f'<div class="match-score">نسبة التطابق: {match_result["score"]:.2f}%</div>', unsafe_allow_html=True)
             
-        except Exception as e:
-            st.error(f"حدث خطأ أثناء معالجة البصمات: {str(e)}")
+            # عرض الحكم النهائي
+            if match_result["is_match"]:
+                st.markdown('<div class="match-result match">البصمتان متطابقتان</div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="match-result no-match">البصمتان غير متطابقتين</div>', unsafe_allow_html=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
     else:
-        st.error("الرجاء تحميل كلا البصمتين للمقارنة")
+        st.error("الرجاء اختيار كلا البصمتين للمقارنة")
 
 # معلومات النظام
 st.header("معلومات النظام")

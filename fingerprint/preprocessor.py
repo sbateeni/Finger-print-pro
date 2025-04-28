@@ -113,4 +113,37 @@ def check_image_quality(image):
         'entropy': -np.sum(np.histogram(gray, bins=256)[0] * np.log2(np.histogram(gray, bins=256)[0] + 1e-10))
     }
     
-    return quality_metrics 
+    return quality_metrics
+
+def preprocess_fingerprint(image):
+    """
+    معالجة صورة البصمة وتحسين جودتها
+    
+    Args:
+        image (numpy.ndarray): صورة البصمة
+        
+    Returns:
+        numpy.ndarray: صورة البصمة المعالجة
+    """
+    # تحويل الصورة إلى تدرج رمادي
+    if len(image.shape) == 3:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    else:
+        gray = image
+    
+    # تحسين التباين باستخدام CLAHE
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    enhanced = clahe.apply(gray)
+    
+    # تطبيق فلتر Gaussian لإزالة الضوضاء
+    blurred = cv2.GaussianBlur(enhanced, (5,5), 0)
+    
+    # تحسين الحواف باستخدام Canny
+    edges = cv2.Canny(blurred, 100, 200)
+    
+    # تطبيق عمليات مورفولوجية لتحسين جودة البصمة
+    kernel = np.ones((3,3), np.uint8)
+    dilated = cv2.dilate(edges, kernel, iterations=1)
+    eroded = cv2.erode(dilated, kernel, iterations=1)
+    
+    return eroded 

@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from .feature_extractor import match_features
+from scipy.spatial.distance import cosine
 
 def match_fingerprints(features1, features2, threshold=0.5):
     """
@@ -125,4 +126,49 @@ def find_best_match(query_features, database_features, threshold=0.5):
                 'confidence': match_result['confidence']
             }
     
-    return best_match 
+    return best_match
+
+def extract_features(image):
+    """
+    استخراج المميزات من صورة البصمة
+    
+    Args:
+        image (numpy.ndarray): صورة البصمة المعالجة
+        
+    Returns:
+        numpy.ndarray: مصفوفة المميزات
+    """
+    # استخدام SIFT لاستخراج النقاط المميزة
+    sift = cv2.SIFT_create()
+    keypoints, descriptors = sift.detectAndCompute(image, None)
+    
+    if descriptors is None:
+        return np.array([])
+    
+    return descriptors
+
+def compare_fingerprints(fp1_features, fp2_features):
+    """
+    مقارنة مميزات بصمتين
+    
+    Args:
+        fp1_features (numpy.ndarray): مميزات البصمة الأولى
+        fp2_features (numpy.ndarray): مميزات البصمة الثانية
+        
+    Returns:
+        float: درجة التطابق بين البصمتين
+    """
+    if len(fp1_features) == 0 or len(fp2_features) == 0:
+        return 0.0
+    
+    # حساب متوسط المميزات لكل بصمة
+    fp1_mean = np.mean(fp1_features, axis=0)
+    fp2_mean = np.mean(fp2_features, axis=0)
+    
+    # حساب درجة التطابق باستخدام جيب التمام
+    similarity = 1 - cosine(fp1_mean, fp2_mean)
+    
+    # تحويل درجة التطابق إلى نسبة مئوية
+    match_score = max(0, min(100, similarity * 100))
+    
+    return match_score 
