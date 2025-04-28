@@ -17,17 +17,23 @@ def preprocess_image(image):
     else:
         gray = image.copy()
     
-    # تحسين التباين
+    # تحسين التباين باستخدام CLAHE
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     enhanced = clahe.apply(gray)
     
-    # إزالة الضوضاء
+    # إزالة الضوضاء باستخدام Non-local Means Denoising
     denoised = cv2.fastNlMeansDenoising(enhanced, None, 10, 7, 21)
     
-    # تحسين الحواف
+    # تحسين الحواف باستخدام Canny
     edges = cv2.Canny(denoised, 100, 200)
     
-    return denoised
+    # تطبيق مرشح Gaussian لإزالة الضوضاء المتبقية
+    blurred = cv2.GaussianBlur(denoised, (5, 5), 0)
+    
+    # تحسين التباين مرة أخرى
+    enhanced_final = clahe.apply(blurred)
+    
+    return enhanced_final
 
 def enhance_image_quality(image):
     """
@@ -45,17 +51,23 @@ def enhance_image_quality(image):
     else:
         gray = image.copy()
     
-    # تحسين التباين
+    # تحسين التباين باستخدام CLAHE
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
     enhanced = clahe.apply(gray)
     
-    # إزالة الضوضاء
+    # إزالة الضوضاء باستخدام Non-local Means Denoising
     denoised = cv2.fastNlMeansDenoising(enhanced, None, 10, 7, 21)
     
-    # تحسين الحواف
+    # تحسين الحواف باستخدام Canny
     edges = cv2.Canny(denoised, 100, 200)
     
-    # تصحيح الإضاءة
+    # تطبيق مرشح Gaussian لإزالة الضوضاء المتبقية
+    blurred = cv2.GaussianBlur(denoised, (5, 5), 0)
+    
+    # تحسين التباين مرة أخرى
+    enhanced_final = clahe.apply(blurred)
+    
+    # تصحيح الإضاءة للصور الملونة
     if len(image.shape) == 3:
         lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
@@ -64,7 +76,7 @@ def enhance_image_quality(image):
         limg = cv2.merge((cl,a,b))
         final = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
     else:
-        final = denoised
+        final = enhanced_final
     
     return {
         'original': image,
@@ -90,12 +102,15 @@ def check_image_quality(image):
     else:
         gray = image.copy()
     
+    # حساب مقاييس الجودة
     quality_metrics = {
         'resolution': f"{image.shape[1]}x{image.shape[0]}",
         'clarity': cv2.Laplacian(gray, cv2.CV_64F).var(),
         'brightness': np.mean(gray),
         'contrast': np.std(gray),
-        'noise_ratio': cv2.meanStdDev(gray)[1][0][0] / cv2.meanStdDev(gray)[0][0][0]
+        'noise_ratio': cv2.meanStdDev(gray)[1][0][0] / cv2.meanStdDev(gray)[0][0][0],
+        'sharpness': cv2.Laplacian(gray, cv2.CV_64F).var(),
+        'entropy': -np.sum(np.histogram(gray, bins=256)[0] * np.log2(np.histogram(gray, bins=256)[0] + 1e-10))
     }
     
     return quality_metrics 

@@ -11,11 +11,34 @@ def extract_features(image):
     Returns:
         dict: قاموس يحتوي على المميزات المستخرجة
     """
-    # إنشاء كائن SIFT
-    sift = cv2.SIFT_create()
+    # إنشاء كائن SIFT مع معلمات محسنة
+    sift = cv2.SIFT_create(
+        nfeatures=0,  # عدد غير محدود من النقاط المميزة
+        nOctaveLayers=3,
+        contrastThreshold=0.04,
+        edgeThreshold=10,
+        sigma=1.6
+    )
     
     # استخراج النقاط المميزة والوصف
     keypoints, descriptors = sift.detectAndCompute(image, None)
+    
+    # تصفية النقاط المميزة حسب الجودة
+    if len(keypoints) > 0:
+        # حساب قوة النقاط المميزة
+        strengths = [kp.response for kp in keypoints]
+        threshold = np.mean(strengths) * 0.5
+        
+        # تصفية النقاط المميزة
+        filtered_keypoints = []
+        filtered_descriptors = []
+        for kp, desc in zip(keypoints, descriptors):
+            if kp.response > threshold:
+                filtered_keypoints.append(kp)
+                filtered_descriptors.append(desc)
+        
+        keypoints = filtered_keypoints
+        descriptors = np.array(filtered_descriptors)
     
     # استخراج إحداثيات النقاط المميزة
     minutiae = np.array([[kp.pt[0], kp.pt[1]] for kp in keypoints])
@@ -60,12 +83,19 @@ def classify_minutiae(image, keypoints):
         gradient_x = cv2.Sobel(roi, cv2.CV_64F, 1, 0, ksize=3)
         gradient_y = cv2.Sobel(roi, cv2.CV_64F, 0, 1, ksize=3)
         gradient_magnitude = np.sqrt(gradient_x**2 + gradient_y**2)
+        gradient_direction = np.arctan2(gradient_y, gradient_x)
+        
+        # حساب التباين المحلي
+        local_contrast = np.std(roi)
         
         # تحديد نوع النقطة المميزة
-        if np.mean(gradient_magnitude) > 50:
-            minutiae_types.append('ridge_ending')
+        if np.mean(gradient_magnitude) > 50 and local_contrast > 30:
+            if np.std(gradient_direction) > 1.0:
+                minutiae_types.append('bifurcation')
+            else:
+                minutiae_types.append('ridge_ending')
         else:
-            minutiae_types.append('bifurcation')
+            minutiae_types.append('unknown')
     
     return minutiae_types
 
@@ -80,7 +110,15 @@ def match_features(features1, features2):
     Returns:
         dict: نتائج المقارنة
     """
-    # إنشاء كائن FLANN matcher
+    # التحقق من وجود واصفات كافية
+    if features1['descriptors'] is None or features2['descriptors'] is None:
+        return {
+            'matches': [],
+            'score': 0.0,
+            'count': 0
+        }
+    
+    # إنشاء كائن FLANN matcher مع معلمات محسنة
     FLANN_INDEX_KDTREE = 1
     index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
     search_params = dict(checks=50)
@@ -89,14 +127,18 @@ def match_features(features1, features2):
     # مقارنة الواصفات
     matches = flann.knnMatch(features1['descriptors'], features2['descriptors'], k=2)
     
-    # تطبيق نسبة Lowe's ratio test
+    # تطبيق نسبة Lowe's ratio test مع عتبة متغيرة
     good_matches = []
     for m, n in matches:
         if m.distance < 0.7 * n.distance:
             good_matches.append(m)
     
     # حساب نسبة التطابق
-    match_score = len(good_matches) / min(len(features1['keypoints']), len(features2['keypoints']))
+    min_features = min(len(features1['keypoints']), len(features2['keypoints']))
+    if min_features > 0:
+        match_score = len(good_matches) / min_features
+    else:
+        match_score = 0.0
     
     return {
         'matches': [(m.queryIdx, m.trainIdx) for m in good_matches],

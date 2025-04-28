@@ -41,6 +41,10 @@ def visualize_features(image, features):
         end_x = int(x + kp.size * np.cos(angle))
         end_y = int(y + kp.size * np.sin(angle))
         cv2.line(vis_image, (x, y), (end_x, end_y), color, 1)
+        
+        # إضافة رقم النقطة
+        cv2.putText(vis_image, str(i), (x+5, y-5),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
     
     return vis_image
 
@@ -76,15 +80,27 @@ def visualize_matching(img1, img2, features1, features2, match_result):
     vis[:h2, w1:w1+w2] = vis_img2
     
     # رسم خطوط التطابق
-    for match in match_result['matches']:
+    for i, match in enumerate(match_result['matches']):
         idx1, idx2 = match
         pt1 = (int(features1['keypoints'][idx1].pt[0]),
                int(features1['keypoints'][idx1].pt[1]))
         pt2 = (int(features2['keypoints'][idx2].pt[0]) + w1,
                int(features2['keypoints'][idx2].pt[1]))
         
+        # تحديد لون الخط حسب نوع النقطة المميزة
+        if features1['minutiae_types'][idx1] == features2['minutiae_types'][idx2]:
+            color = (0, 255, 0)  # أخضر للتطابق
+        else:
+            color = (0, 0, 255)  # أحمر لعدم التطابق
+        
         # رسم خط التطابق
-        cv2.line(vis, pt1, pt2, (0, 255, 0), 1)
+        cv2.line(vis, pt1, pt2, color, 1)
+        
+        # إضافة رقم التطابق
+        mid_x = (pt1[0] + pt2[0]) // 2
+        mid_y = (pt1[1] + pt2[1]) // 2
+        cv2.putText(vis, str(i), (mid_x, mid_y),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
     
     return vis
 
@@ -119,6 +135,14 @@ def plot_quality_metrics(metrics):
         ax.text(bar.get_x() + bar.get_width()/2., height,
                 f'{height:.2f}',
                 ha='center', va='bottom')
+    
+    # إضافة خطوط الشبكة
+    ax.grid(True, linestyle='--', alpha=0.7)
+    
+    # تخصيص الألوان
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2']
+    for bar, color in zip(bars, colors):
+        bar.set_color(color)
     
     plt.tight_layout()
     return fig 

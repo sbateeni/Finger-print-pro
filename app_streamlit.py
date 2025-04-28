@@ -49,86 +49,95 @@ with col1:
     st.subheader("البصمة الأولى")
     fp1_file = st.file_uploader("اختر البصمة الأولى", type=['png', 'jpg', 'jpeg'], key="fp1")
     if fp1_file:
-        fp1_image = Image.open(fp1_file)
-        st.image(fp1_image, caption="البصمة الأولى", use_container_width=True)
+        try:
+            fp1_image = Image.open(fp1_file)
+            st.image(fp1_image, caption="البصمة الأولى", use_container_width=True)
+        except Exception as e:
+            st.error(f"خطأ في تحميل الصورة: {str(e)}")
 
 with col2:
     st.subheader("البصمة الثانية")
     fp2_file = st.file_uploader("اختر البصمة الثانية", type=['png', 'jpg', 'jpeg'], key="fp2")
     if fp2_file:
-        fp2_image = Image.open(fp2_file)
-        st.image(fp2_image, caption="البصمة الثانية", use_container_width=True)
+        try:
+            fp2_image = Image.open(fp2_file)
+            st.image(fp2_image, caption="البصمة الثانية", use_container_width=True)
+        except Exception as e:
+            st.error(f"خطأ في تحميل الصورة: {str(e)}")
 
 # زر بدء المعالجة
 if st.button("بدء المعالجة والمقارنة"):
     if fp1_file and fp2_file:
-        # تحويل الصور إلى مصفوفات NumPy
-        fp1_array = np.array(fp1_image)
-        fp2_array = np.array(fp2_image)
-        
-        # إنشاء شريط تقدم
-        progress_bar = st.progress(0)
-        
-        # معالجة البصمات
-        with st.spinner("جاري معالجة البصمات..."):
-            # تحسين جودة الصور
-            fp1_enhanced = enhance_image_quality(fp1_array)
-            fp2_enhanced = enhance_image_quality(fp2_array)
-            progress_bar.progress(20)
+        try:
+            # تحويل الصور إلى مصفوفات NumPy
+            fp1_array = np.array(fp1_image)
+            fp2_array = np.array(fp2_image)
             
-            # فحص جودة الصور
-            fp1_quality = check_image_quality(fp1_enhanced['final'])
-            fp2_quality = check_image_quality(fp2_enhanced['final'])
-            progress_bar.progress(40)
+            # إنشاء شريط تقدم
+            progress_bar = st.progress(0)
             
-            # استخراج المميزات
-            fp1_features = extract_features(fp1_enhanced['final'])
-            fp2_features = extract_features(fp2_enhanced['final'])
-            progress_bar.progress(60)
+            # معالجة البصمات
+            with st.spinner("جاري معالجة البصمات..."):
+                # تحسين جودة الصور
+                fp1_enhanced = enhance_image_quality(fp1_array)
+                fp2_enhanced = enhance_image_quality(fp2_array)
+                progress_bar.progress(20)
+                
+                # فحص جودة الصور
+                fp1_quality = check_image_quality(fp1_enhanced['final'])
+                fp2_quality = check_image_quality(fp2_enhanced['final'])
+                progress_bar.progress(40)
+                
+                # استخراج المميزات
+                fp1_features = extract_features(fp1_enhanced['final'])
+                fp2_features = extract_features(fp2_enhanced['final'])
+                progress_bar.progress(60)
+                
+                # مقارنة البصمات
+                match_result = match_fingerprints(fp1_features, fp2_features)
+                progress_bar.progress(80)
+                
+                # تصور النتائج
+                fp1_vis = visualize_features(fp1_enhanced['final'], fp1_features)
+                fp2_vis = visualize_features(fp2_enhanced['final'], fp2_features)
+                matching_vis = visualize_matching(fp1_enhanced['final'], fp2_enhanced['final'],
+                                               fp1_features, fp2_features, match_result)
+                progress_bar.progress(100)
             
-            # مقارنة البصمات
-            match_result = match_fingerprints(fp1_features, fp2_features)
-            progress_bar.progress(80)
+            # عرض النتائج
+            st.header("نتائج المعالجة")
             
-            # تصور النتائج
-            fp1_vis = visualize_features(fp1_enhanced['final'], fp1_features)
-            fp2_vis = visualize_features(fp2_enhanced['final'], fp2_features)
-            matching_vis = visualize_matching(fp1_enhanced['final'], fp2_enhanced['final'],
-                                           fp1_features, fp2_features, match_result)
-            progress_bar.progress(100)
-        
-        # عرض النتائج
-        st.header("نتائج المعالجة")
-        
-        # عرض مقاييس الجودة
-        col1, col2 = st.columns(2)
-        with col1:
-            st.subheader("جودة البصمة الأولى")
-            st.plotly_chart(plot_quality_metrics(fp1_quality))
-        with col2:
-            st.subheader("جودة البصمة الثانية")
-            st.plotly_chart(plot_quality_metrics(fp2_quality))
-        
-        # عرض النقاط المميزة
-        st.subheader("النقاط المميزة")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.image(fp1_vis, caption="النقاط المميزة - البصمة الأولى")
-        with col2:
-            st.image(fp2_vis, caption="النقاط المميزة - البصمة الثانية")
-        
-        # عرض نتيجة المطابقة
-        st.subheader("نتيجة المطابقة")
-        st.image(matching_vis, caption="تمثيل بصري للتطابق بين البصمتين")
-        
-        # عرض إحصائيات المطابقة
-        st.markdown(f"""
-        ### إحصائيات المطابقة
-        - نسبة التطابق: {match_result['score']:.2%}
-        - عدد النقاط المتطابقة: {match_result['match_count']}
-        - النتيجة: {'تطابق' if match_result['is_match'] else 'عدم تطابق'}
-        """)
-        
+            # عرض مقاييس الجودة
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("جودة البصمة الأولى")
+                st.plotly_chart(plot_quality_metrics(fp1_quality))
+            with col2:
+                st.subheader("جودة البصمة الثانية")
+                st.plotly_chart(plot_quality_metrics(fp2_quality))
+            
+            # عرض النقاط المميزة
+            st.subheader("النقاط المميزة")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.image(fp1_vis, caption="النقاط المميزة - البصمة الأولى", use_container_width=True)
+            with col2:
+                st.image(fp2_vis, caption="النقاط المميزة - البصمة الثانية", use_container_width=True)
+            
+            # عرض نتيجة المطابقة
+            st.subheader("نتيجة المطابقة")
+            st.image(matching_vis, caption="تمثيل بصري للتطابق بين البصمتين", use_container_width=True)
+            
+            # عرض إحصائيات المطابقة
+            st.markdown(f"""
+            ### إحصائيات المطابقة
+            - نسبة التطابق: {match_result['score']:.2%}
+            - عدد النقاط المتطابقة: {match_result['match_count']}
+            - النتيجة: {'تطابق' if match_result['is_match'] else 'عدم تطابق'}
+            """)
+            
+        except Exception as e:
+            st.error(f"حدث خطأ أثناء معالجة البصمات: {str(e)}")
     else:
         st.error("الرجاء تحميل كلا البصمتين للمقارنة")
 
