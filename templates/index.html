@@ -49,6 +49,59 @@
         .progress-bar {
             background-color: #0d6efd;
         }
+        .step-container {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+        }
+        .step-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #0d6efd;
+        }
+        .step-description {
+            margin-bottom: 15px;
+            color: #6c757d;
+        }
+        .image-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 15px 0;
+        }
+        .image-card {
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .image-caption {
+            text-align: center;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .metric-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        .metric-label {
+            color: #6c757d;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -88,13 +141,13 @@
                 <div class="col-md-6">
                     <div class="result-container">
                         <h3>📊 جودة الصور - البصمة الأولى</h3>
-                        <div id="quality1"></div>
+                        <div id="quality1" class="metrics-grid"></div>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="result-container">
                         <h3>📊 جودة الصور - البصمة الثانية</h3>
-                        <div id="quality2"></div>
+                        <div id="quality2" class="metrics-grid"></div>
                     </div>
                 </div>
             </div>
@@ -102,14 +155,14 @@
             <div class="row mt-4">
                 <div class="col-md-6">
                     <div class="result-container">
-                        <h3>🔄 خطوات المعالجة المسبقة - البصمة الأولى</h3>
-                        <div id="processing1"></div>
+                        <h3>🔄 خطوات المعالجة - البصمة الأولى</h3>
+                        <div id="processing1" class="image-grid"></div>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="result-container">
-                        <h3>🔄 خطوات المعالجة المسبقة - البصمة الثانية</h3>
-                        <div id="processing2"></div>
+                        <h3>🔄 خطوات المعالجة - البصمة الثانية</h3>
+                        <div id="processing2" class="image-grid"></div>
                     </div>
                 </div>
             </div>
@@ -118,42 +171,45 @@
                 <div class="col-md-6">
                     <div class="result-container">
                         <h3>📍 النقاط المميزة - البصمة الأولى</h3>
-                        <img id="features1" class="fingerprint-image">
+                        <div class="image-card">
+                            <img id="features1" class="fingerprint-image">
+                            <div class="image-caption">النقاط المميزة المكتشفة</div>
+                        </div>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="result-container">
                         <h3>📍 النقاط المميزة - البصمة الثانية</h3>
-                        <img id="features2" class="fingerprint-image">
+                        <div class="image-card">
+                            <img id="features2" class="fingerprint-image">
+                            <div class="image-caption">النقاط المميزة المكتشفة</div>
+                        </div>
                     </div>
                 </div>
             </div>
 
             <div class="result-container mt-4">
                 <h3>🔍 نتيجة المقارنة</h3>
-                <div class="row">
-                    <div class="col-md-4">
-                        <div class="quality-metric">
-                            <h4>نسبة التطابق</h4>
-                            <p id="matchScore" class="h2 text-primary"></p>
-                        </div>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value" id="matchScore"></div>
+                        <div class="metric-label">نسبة التطابق</div>
                     </div>
-                    <div class="col-md-4">
-                        <div class="quality-metric">
-                            <h4>عدد النقاط المميزة - البصمة الأولى</h4>
-                            <p id="featuresCount1" class="h2 text-primary"></p>
-                        </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="featuresCount1"></div>
+                        <div class="metric-label">عدد النقاط المميزة - البصمة الأولى</div>
                     </div>
-                    <div class="col-md-4">
-                        <div class="quality-metric">
-                            <h4>عدد النقاط المميزة - البصمة الثانية</h4>
-                            <p id="featuresCount2" class="h2 text-primary"></p>
-                        </div>
+                    <div class="metric-card">
+                        <div class="metric-value" id="featuresCount2"></div>
+                        <div class="metric-label">عدد النقاط المميزة - البصمة الثانية</div>
                     </div>
                 </div>
                 <div class="mt-4">
                     <h4>خطوط التطابق</h4>
-                    <img id="matching" class="fingerprint-image">
+                    <div class="image-card">
+                        <img id="matching" class="fingerprint-image">
+                        <div class="image-caption">تمثيل بصري للتطابق بين البصمتين</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -170,8 +226,11 @@
             
             for (const [metric, value] of Object.entries(quality)) {
                 const div = document.createElement('div');
-                div.className = 'quality-metric';
-                div.innerHTML = `<strong>${metric}:</strong> ${value}`;
+                div.className = 'metric-card';
+                div.innerHTML = `
+                    <div class="metric-value">${typeof value === 'number' ? value.toFixed(2) : value}</div>
+                    <div class="metric-label">${metric}</div>
+                `;
                 container.appendChild(div);
             }
         }
@@ -182,10 +241,10 @@
             
             for (const [step, url] of Object.entries(images)) {
                 const div = document.createElement('div');
-                div.className = 'processing-step';
+                div.className = 'image-card';
                 div.innerHTML = `
-                    <h4>${step}</h4>
                     <img src="${url}" class="fingerprint-image">
+                    <div class="image-caption">${step}</div>
                 `;
                 container.appendChild(div);
             }
@@ -253,7 +312,12 @@
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    document.getElementById('preview1').innerHTML = `<img src="${e.target.result}" class="fingerprint-image">`;
+                    document.getElementById('preview1').innerHTML = `
+                        <div class="image-card">
+                            <img src="${e.target.result}" class="fingerprint-image">
+                            <div class="image-caption">معاينة البصمة الأولى</div>
+                        </div>
+                    `;
                 }
                 reader.readAsDataURL(file);
             }
@@ -264,7 +328,12 @@
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    document.getElementById('preview2').innerHTML = `<img src="${e.target.result}" class="fingerprint-image">`;
+                    document.getElementById('preview2').innerHTML = `
+                        <div class="image-card">
+                            <img src="${e.target.result}" class="fingerprint-image">
+                            <div class="image-caption">معاينة البصمة الثانية</div>
+                        </div>
+                    `;
                 }
                 reader.readAsDataURL(file);
             }
