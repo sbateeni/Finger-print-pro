@@ -1,135 +1,274 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
+<html dir="rtl" lang="ar">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام مطابقة البصمات</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <title>نظام مقارنة البصمات</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+        }
+        .upload-container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .quality-metric {
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+        }
+        .processing-step {
+            background-color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .result-container {
+            background-color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .fingerprint-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .progress {
+            height: 25px;
+        }
+        .progress-bar {
+            background-color: #0d6efd;
+        }
+    </style>
 </head>
 <body>
-    <div class="container">
-        <header class="text-center my-5">
-            <h1><i class="bi bi-fingerprint"></i> نظام مطابقة البصمات</h1>
-            <p class="lead">نظام متقدم لمقارنة وتحليل البصمات باستخدام تقنيات معالجة الصور والذكاء الاصطناعي</p>
-        </header>
+    <div class="container py-4">
+        <h1 class="text-center mb-4">👆 نظام مقارنة البصمات</h1>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="upload-container">
+                    <h3>البصمة الأولى</h3>
+                    <input type="file" class="form-control" id="fingerprint1" accept=".jpg,.jpeg,.png">
+                    <div id="preview1" class="mt-3"></div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="upload-container">
+                    <h3>البصمة الثانية</h3>
+                    <input type="file" class="form-control" id="fingerprint2" accept=".jpg,.jpeg,.png">
+                    <div id="preview2" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
 
-        <div class="row justify-content-center">
-            <div class="col-lg-10">
-                <form id="upload-form" class="card">
-                    <div class="card-body">
-                        <div class="row">
-                            <div class="col-md-6 mb-4">
-                                <div class="upload-container">
-                                    <label for="fingerprint1" class="form-label">
-                                        <i class="bi bi-upload"></i> البصمة الأولى
-                                    </label>
-                                    <div class="upload-area" id="upload-area1">
-                                        <input type="file" class="form-control" id="fingerprint1" name="fingerprint1" accept="image/*" required>
-                                        <div class="upload-placeholder">
-                                            <i class="bi bi-cloud-arrow-up"></i>
-                                            <p>اسحب الصورة هنا أو انقر للاختيار</p>
-                                        </div>
-                                        <img id="preview1" class="preview mt-2" style="display: none;">
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="col-md-6 mb-4">
-                                <div class="upload-container">
-                                    <label for="fingerprint2" class="form-label">
-                                        <i class="bi bi-upload"></i> البصمة الثانية
-                                    </label>
-                                    <div class="upload-area" id="upload-area2">
-                                        <input type="file" class="form-control" id="fingerprint2" name="fingerprint2" accept="image/*" required>
-                                        <div class="upload-placeholder">
-                                            <i class="bi bi-cloud-arrow-up"></i>
-                                            <p>اسحب الصورة هنا أو انقر للاختيار</p>
-                                        </div>
-                                        <img id="preview2" class="preview mt-2" style="display: none;">
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <button type="submit" id="upload-button" class="btn btn-primary w-100">
-                            <i class="bi bi-search"></i> مقارنة البصمات
-                        </button>
-                    </div>
-                </form>
+        <div class="text-center mt-4">
+            <button class="btn btn-primary btn-lg" onclick="compareFingerprints()">🔍 مقارنة البصمات</button>
+        </div>
 
-                <div id="processing-status" class="card mt-4" style="display: none;">
-                    <div class="card-body">
-                        <h4 class="card-title mb-4">
-                            <i class="bi bi-gear-fill"></i> حالة المعالجة
-                        </h4>
-                        <div class="progress-container"></div>
+        <div id="progress" class="mt-4" style="display: none;">
+            <div class="progress">
+                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+            </div>
+            <p id="status" class="text-center mt-2">جاري المعالجة...</p>
+        </div>
+
+        <div id="results" style="display: none;">
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="result-container">
+                        <h3>📊 جودة الصور - البصمة الأولى</h3>
+                        <div id="quality1"></div>
                     </div>
                 </div>
+                <div class="col-md-6">
+                    <div class="result-container">
+                        <h3>📊 جودة الصور - البصمة الثانية</h3>
+                        <div id="quality2"></div>
+                    </div>
+                </div>
+            </div>
 
-                <div id="results-section" class="card mt-4" style="display: none;">
-                    <div class="card-body">
-                        <h2 class="card-title mb-4">
-                            <i class="bi bi-clipboard-data"></i> نتائج المقارنة
-                        </h2>
-                        
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <div class="result-box text-center">
-                                    <h3><i class="bi bi-percent"></i> درجة التطابق</h3>
-                                    <p id="match-score" class="display-4"></p>
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="result-box text-center">
-                                    <h3><i class="bi bi-intersect"></i> النقاط المتطابقة</h3>
-                                    <p id="matching-points" class="display-4"></p>
-                                </div>
-                            </div>
-                        </div>
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="result-container">
+                        <h3>🔄 خطوات المعالجة المسبقة - البصمة الأولى</h3>
+                        <div id="processing1"></div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="result-container">
+                        <h3>🔄 خطوات المعالجة المسبقة - البصمة الثانية</h3>
+                        <div id="processing2"></div>
+                    </div>
+                </div>
+            </div>
 
-                        <div class="row mb-4">
-                            <div class="col-md-6">
-                                <div class="image-box">
-                                    <h4><i class="bi bi-image"></i> البصمة الأولى المعالجة</h4>
-                                    <img id="processed1" class="img-fluid" style="display: none;">
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="image-box">
-                                    <h4><i class="bi bi-image"></i> البصمة الثانية المعالجة</h4>
-                                    <img id="processed2" class="img-fluid" style="display: none;">
-                                </div>
-                            </div>
-                        </div>
+            <div class="row mt-4">
+                <div class="col-md-6">
+                    <div class="result-container">
+                        <h3>📍 النقاط المميزة - البصمة الأولى</h3>
+                        <img id="features1" class="fingerprint-image">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="result-container">
+                        <h3>📍 النقاط المميزة - البصمة الثانية</h3>
+                        <img id="features2" class="fingerprint-image">
+                    </div>
+                </div>
+            </div>
 
-                        <div class="row mb-4">
-                            <div class="col-12">
-                                <div class="image-box">
-                                    <h4><i class="bi bi-arrows-angle-contract"></i> نتيجة التطابق</h4>
-                                    <img id="matching" class="img-fluid" style="display: none;">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-12">
-                                <div class="performance-box">
-                                    <h4><i class="bi bi-graph-up"></i> إحصائيات الأداء</h4>
-                                    <div id="performance-stats"></div>
-                                </div>
-                            </div>
+            <div class="result-container mt-4">
+                <h3>🔍 نتيجة المقارنة</h3>
+                <div class="row">
+                    <div class="col-md-4">
+                        <div class="quality-metric">
+                            <h4>نسبة التطابق</h4>
+                            <p id="matchScore" class="h2 text-primary"></p>
                         </div>
                     </div>
+                    <div class="col-md-4">
+                        <div class="quality-metric">
+                            <h4>عدد النقاط المميزة - البصمة الأولى</h4>
+                            <p id="featuresCount1" class="h2 text-primary"></p>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="quality-metric">
+                            <h4>عدد النقاط المميزة - البصمة الثانية</h4>
+                            <p id="featuresCount2" class="h2 text-primary"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4">
+                    <h4>خطوط التطابق</h4>
+                    <img id="matching" class="fingerprint-image">
                 </div>
             </div>
         </div>
     </div>
 
-    <footer class="text-center py-4 mt-5">
-        <p>تم التطوير بواسطة <a href="#" target="_blank">فريق تطوير البصمات</a></p>
-    </footer>
+    <script>
+        function updateProgress(percent) {
+            document.querySelector('.progress-bar').style.width = percent + '%';
+        }
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+        function showQualityMetrics(quality, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            for (const [metric, value] of Object.entries(quality)) {
+                const div = document.createElement('div');
+                div.className = 'quality-metric';
+                div.innerHTML = `<strong>${metric}:</strong> ${value}`;
+                container.appendChild(div);
+            }
+        }
+
+        function showProcessingSteps(images, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            for (const [step, url] of Object.entries(images)) {
+                const div = document.createElement('div');
+                div.className = 'processing-step';
+                div.innerHTML = `
+                    <h4>${step}</h4>
+                    <img src="${url}" class="fingerprint-image">
+                `;
+                container.appendChild(div);
+            }
+        }
+
+        async function compareFingerprints() {
+            const fp1 = document.getElementById('fingerprint1').files[0];
+            const fp2 = document.getElementById('fingerprint2').files[0];
+
+            if (!fp1 || !fp2) {
+                alert('يرجى اختيار صورتين للبصمات');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('fingerprint1', fp1);
+            formData.append('fingerprint2', fp2);
+
+            document.getElementById('progress').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            updateProgress(0);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+
+                updateProgress(100);
+                document.getElementById('results').style.display = 'block';
+
+                // عرض نتائج الجودة
+                showQualityMetrics(result.quality1, 'quality1');
+                showQualityMetrics(result.quality2, 'quality2');
+
+                // عرض خطوات المعالجة
+                showProcessingSteps(result.processed_images.fp1, 'processing1');
+                showProcessingSteps(result.processed_images.fp2, 'processing2');
+
+                // عرض النقاط المميزة
+                document.getElementById('features1').src = result.features_images.fp1;
+                document.getElementById('features2').src = result.features_images.fp2;
+
+                // عرض نتيجة المقارنة
+                document.getElementById('matchScore').textContent = (result.match_score * 100).toFixed(2) + '%';
+                document.getElementById('featuresCount1').textContent = result.features_count1;
+                document.getElementById('featuresCount2').textContent = result.features_count2;
+                document.getElementById('matching').src = result.matching_image;
+
+            } catch (error) {
+                alert('حدث خطأ: ' + error.message);
+                document.getElementById('progress').style.display = 'none';
+            }
+        }
+
+        // معاينة الصور
+        document.getElementById('fingerprint1').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('preview1').innerHTML = `<img src="${e.target.result}" class="fingerprint-image">`;
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        document.getElementById('fingerprint2').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('preview2').innerHTML = `<img src="${e.target.result}" class="fingerprint-image">`;
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+    </script>
 </body>
 </html> 

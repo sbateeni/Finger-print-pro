@@ -255,9 +255,17 @@ if compare_button and fingerprint1 and fingerprint2:
         status_text.text("جاري معالجة الصور...")
         progress_bar.progress(30)
         
+        # قراءة الصور من المسارات وتحويلها إلى numpy arrays
+        img1_array = cv2.imread(img1_path)
+        img2_array = cv2.imread(img2_path)
+        
+        # التأكد من أن الصور تم قراءتها بنجاح
+        if img1_array is None or img2_array is None:
+            raise ValueError("فشل في قراءة الصور من المسارات المحددة")
+        
         # تحويل الصور إلى numpy arrays
-        processed_fp1 = preprocessor.preprocess_image(img1_path)
-        processed_fp2 = preprocessor.preprocess_image(img2_path)
+        processed_fp1 = preprocessor.preprocess_image(img1_array)
+        processed_fp2 = preprocessor.preprocess_image(img2_array)
         
         # التأكد من أن الصور هي numpy arrays
         if not isinstance(processed_fp1, np.ndarray):
