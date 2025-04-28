@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام مطابقة البصمات</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">نظام مطابقة البصمات</h1>
+        
+        <div class="section">
+            <h2>تحميل البصمات</h2>
+            <form id="fingerprint-form" method="POST" enctype="multipart/form-data">
+                <div class="upload-section">
+                    <div class="upload-field">
+                        <label for="fingerprint1">البصمة الأولى</label>
+                        <input type="file" id="fingerprint1" name="fingerprint1" accept="image/*" required>
+                        <img id="preview1" class="preview" style="display: none;">
+                    </div>
+                    
+                    <div class="upload-field">
+                        <label for="fingerprint2">البصمة الثانية</label>
+                        <input type="file" id="fingerprint2" name="fingerprint2" accept="image/*" required>
+                        <img id="preview2" class="preview" style="display: none;">
+                    </div>
+                </div>
+                
+                <button type="submit" class="button">بدء المعالجة والمقارنة</button>
+            </form>
+        </div>
+        
+        <div class="section">
+            <h2>نتائج المعالجة</h2>
+            <div class="progress-bar">
+                <div class="progress-bar-fill" style="width: 0%"></div>
+            </div>
+            
+            <div class="results">
+                <!-- سيتم إضافة النتائج هنا عبر JavaScript -->
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2>معلومات النظام</h2>
+            <ul class="list">
+                <li class="list-item">يدعم النظام مقارنة بصمات الأصابع باستخدام خوارزميات متقدمة</li>
+                <li class="list-item">يمكن تحميل الصور بصيغ PNG, JPG, JPEG</li>
+                <li class="list-item">يتم معالجة الصور تلقائياً لتحسين جودة المقارنة</li>
+                <li class="list-item">يعرض النظام النقاط المميزة وخطوط التطابق</li>
+                <li class="list-item">يحسب نسبة التطابق بين البصمتين</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html> 
