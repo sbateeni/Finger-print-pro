@@ -16,7 +16,7 @@ def extract_features(image):
     """
     device_info = get_device_info()
     
-    # إنشاء كائنات المستخرجين
+    # إنشاء كائن SIFT
     sift = cv2.SIFT_create(
         nfeatures=0,
         nOctaveLayers=3,
@@ -25,26 +25,8 @@ def extract_features(image):
         sigma=1.6
     )
     
-    orb = cv2.ORB_create(
-        nfeatures=1000,
-        scaleFactor=1.2,
-        nlevels=8,
-        edgeThreshold=31,
-        firstLevel=0,
-        WTA_K=2,
-        patchSize=31,
-        fastThreshold=20
-    )
-    
     # استخراج النقاط المميزة والوصف باستخدام SIFT
-    sift_keypoints, sift_descriptors = sift.detectAndCompute(image, None)
-    
-    # استخراج النقاط المميزة والوصف باستخدام ORB
-    orb_keypoints, orb_descriptors = orb.detectAndCompute(image, None)
-    
-    # دمج النقاط المميزة والوصف
-    keypoints = sift_keypoints + orb_keypoints
-    descriptors = np.vstack([sift_descriptors, orb_descriptors]) if sift_descriptors is not None and orb_descriptors is not None else None
+    keypoints, descriptors = sift.detectAndCompute(image, None)
     
     # تصفية النقاط المميزة حسب الجودة
     if len(keypoints) > 0 and descriptors is not None:
@@ -61,10 +43,10 @@ def extract_features(image):
                 filtered_descriptors.append(desc)
         
         keypoints = filtered_keypoints
-        descriptors = np.array(filtered_descriptors)
+        descriptors = np.array(filtered_descriptors) if filtered_descriptors else None
     
     # استخراج إحداثيات النقاط المميزة
-    minutiae = np.array([[kp.pt[0], kp.pt[1]] for kp in keypoints])
+    minutiae = np.array([[kp.pt[0], kp.pt[1]] for kp in keypoints]) if keypoints else np.array([])
     
     # تصنيف النقاط المميزة
     minutiae_types = classify_minutiae(image, keypoints)
@@ -147,35 +129,40 @@ def match_features(features1, features2):
             'count': 0
         }
     
-    # إنشاء كائنات المطابقة
+    # إنشاء كائن المطابقة
     FLANN_INDEX_KDTREE = 1
     index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
     search_params = dict(checks=50)
     flann = cv2.FlannBasedMatcher(index_params, search_params)
     
-    bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
-    
-    # مقارنة الواصفات باستخدام FLANN
-    flann_matches = flann.knnMatch(features1['descriptors'], features2['descriptors'], k=2)
-    
-    # مقارنة الواصفات باستخدام BF
-    bf_matches = bf.match(features1['descriptors'], features2['descriptors'])
-    
-    # تطبيق نسبة Lowe's ratio test مع عتبة متغيرة
-    good_matches = []
-    for m, n in flann_matches:
-        if m.distance < 0.7 * n.distance:
-            good_matches.append(m)
-    
-    # إضافة التطابقات الجيدة من BF
-    good_matches.extend([m for m in bf_matches if m.distance < 50])
-    
-    # حساب نسبة التطابق
-    min_features = min(len(features1['keypoints']), len(features2['keypoints']))
-    if min_features > 0:
-        match_score = len(good_matches) / min_features
-    else:
-        match_score = 0.0
+    try:
+        # مقارنة الواصفات باستخدام FLANN
+        matches = flann.knnMatch(
+            features1['descriptors'].astype(np.float32),
+            features2['descriptors'].astype(np.float32),
+            k=2
+        )
+        
+        # تطبيق نسبة Lowe's ratio test
+        good_matches = []
+        for m, n in matches:
+            if m.distance < 0.7 * n.distance:
+                good_matches.append(m)
+        
+        # حساب نسبة التطابق
+        min_features = min(len(features1['keypoints']), len(features2['keypoints']))
+        if min_features > 0:
+            match_score = len(good_matches) / min_features
+        else:
+            match_score = 0.0
+            
+    except Exception as e:
+        print(f"Error during matching: {str(e)}")
+        return {
+            'matches': [],
+            'score': 0.0,
+            'count': 0
+        }
     
     # تنظيف الذاكرة
     gc.collect()
