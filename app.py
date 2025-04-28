@@ -387,9 +387,18 @@ def upload_files():
         if fp1.filename == '' or fp2.filename == '':
             return jsonify({'error': 'لم يتم اختيار ملفات'}), 400
 
-        # قراءة الصور
-        img1 = np.array(Image.open(fp1))
-        img2 = np.array(Image.open(fp2))
+        # قراءة الصور وتحويلها إلى numpy arrays
+        img1 = cv2.imdecode(np.frombuffer(fp1.read(), np.uint8), cv2.IMREAD_COLOR)
+        img2 = cv2.imdecode(np.frombuffer(fp2.read(), np.uint8), cv2.IMREAD_COLOR)
+
+        if img1 is None or img2 is None:
+            return jsonify({'error': 'فشل في قراءة الصور'}), 400
+
+        # التأكد من أن الصور من نوع uint8
+        if img1.dtype != np.uint8:
+            img1 = img1.astype(np.uint8)
+        if img2.dtype != np.uint8:
+            img2 = img2.astype(np.uint8)
 
         # فحص جودة الصور
         quality1 = check_image_quality(img1)
@@ -424,11 +433,16 @@ def upload_files():
         processed_fp1 = preprocessor.preprocess_image(enhanced1['final'])
         processed_fp2 = preprocessor.preprocess_image(enhanced2['final'])
 
-        # التأكد من أن الصور هي numpy arrays
+        # التأكد من أن الصور هي numpy arrays من نوع uint8
         if not isinstance(processed_fp1, np.ndarray):
             processed_fp1 = np.array(processed_fp1)
         if not isinstance(processed_fp2, np.ndarray):
             processed_fp2 = np.array(processed_fp2)
+        
+        if processed_fp1.dtype != np.uint8:
+            processed_fp1 = processed_fp1.astype(np.uint8)
+        if processed_fp2.dtype != np.uint8:
+            processed_fp2 = processed_fp2.astype(np.uint8)
 
         # استخراج المميزات
         features1 = feature_extractor.extract_features(processed_fp1)

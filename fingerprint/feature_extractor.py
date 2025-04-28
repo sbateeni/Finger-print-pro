@@ -41,6 +41,10 @@ class FeatureExtractor:
             else:
                 gray = image.copy()
             
+            # التأكد من أن الصورة من نوع uint8
+            if gray.dtype != np.uint8:
+                gray = gray.astype(np.uint8)
+            
             # تحسين التباين باستخدام CLAHE
             clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8,8))
             enhanced = clahe.apply(gray)
@@ -116,6 +120,10 @@ class FeatureExtractor:
     def extract_minutiae(self, image: np.ndarray) -> List[Tuple[int, int, str, float]]:
         """استخراج النقاط المميزة من الصورة"""
         try:
+            # التأكد من أن الصورة من نوع uint8
+            if image.dtype != np.uint8:
+                image = image.astype(np.uint8)
+            
             # تطبيق Otsu's thresholding
             _, binary = cv2.threshold(image, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
             
