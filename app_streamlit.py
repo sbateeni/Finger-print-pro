@@ -428,7 +428,7 @@ def main():
                     
                     # مقارنة البصمات
                     if features1 and features2:
-                        match_score = match_features(features1, features2)
+                        match_score, matches = match_features(features1, features2)
                         st.markdown(f'<div class="match-score">نسبة التطابق: {match_score:.2f}%</div>', unsafe_allow_html=True)
                         
                         if match_score > 80:
