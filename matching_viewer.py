@@ -39,26 +39,38 @@ def draw_minutiae_with_matches(image, features, matches=None, other_image=None):
                 if M["m00"] != 0:
                     cX = int(M["m10"] / M["m00"])
                     cY = int(M["m01"] / M["m00"])
-                    cv2.circle(img_with_minutiae, (cX, cY), 5, color, -1)
+                    
+                    # رسم دائرة حول النقطة المميزة
+                    cv2.circle(img_with_minutiae, (cX, cY), 8, color, -1)
+                    
+                    # رسم رقم النقطة المميزة
+                    cv2.putText(img_with_minutiae, str(len(features['minutiae'][minutiae_type])), 
+                              (cX-10, cY-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
             except:
                 continue
     
     # رسم خطوط التطابق إذا كانت هناك تطابقات
     if matches is not None and other_image is not None:
-        for match in matches:
+        for i, match in enumerate(matches):
             try:
                 # الحصول على إحداثيات النقاط المتطابقة
                 pt1 = (int(match[0][0]), int(match[0][1]))
                 pt2 = (int(match[1][0]), int(match[1][1]))
                 
                 # رسم دائرة حول النقطة في الصورة الأولى
-                cv2.circle(img_with_minutiae, pt1, 8, (0, 255, 255), 2)
+                cv2.circle(img_with_minutiae, pt1, 10, (0, 255, 255), 2)
                 
                 # رسم دائرة حول النقطة في الصورة الثانية
-                cv2.circle(other_image, pt2, 8, (0, 255, 255), 2)
+                cv2.circle(other_image, pt2, 10, (0, 255, 255), 2)
                 
                 # رسم خط التطابق
                 cv2.line(img_with_minutiae, pt1, pt2, (0, 255, 255), 2)
+                
+                # رسم رقم التطابق
+                cv2.putText(img_with_minutiae, str(i+1), 
+                          (pt1[0]-10, pt1[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+                cv2.putText(other_image, str(i+1), 
+                          (pt2[0]-10, pt2[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
             except:
                 continue
     
@@ -80,20 +92,26 @@ def create_matching_image(image1, image2, matches):
     matching_image[:h2, w1:] = image2
     
     # رسم خطوط التطابق
-    for match in matches:
+    for i, match in enumerate(matches):
         try:
             # إحداثيات النقاط المتطابقة
             pt1 = (int(match[0][0]), int(match[0][1]))
             pt2 = (int(match[1][0]) + w1, int(match[1][1]))
             
             # رسم دائرة حول النقطة في البصمة الأولى
-            cv2.circle(matching_image, pt1, 8, (0, 255, 255), 2)
+            cv2.circle(matching_image, pt1, 10, (0, 255, 255), 2)
             
             # رسم دائرة حول النقطة في البصمة الثانية
-            cv2.circle(matching_image, pt2, 8, (0, 255, 255), 2)
+            cv2.circle(matching_image, pt2, 10, (0, 255, 255), 2)
             
             # رسم خط التطابق
             cv2.line(matching_image, pt1, pt2, (0, 255, 255), 2)
+            
+            # رسم رقم التطابق
+            cv2.putText(matching_image, str(i+1), 
+                       (pt1[0]-10, pt1[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+            cv2.putText(matching_image, str(i+1), 
+                       (pt2[0]-10, pt2[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
         except:
             continue
     
