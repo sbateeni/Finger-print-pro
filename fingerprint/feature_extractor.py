@@ -1,8 +1,5 @@
 import cv2
 import numpy as np
-import torch
-import gc
-from .preprocessor import get_device_info
 from scipy.spatial.distance import cosine
 
 def extract_features(image):
@@ -13,9 +10,6 @@ def extract_features(image):
         
         # استخراج النقاط المميزة والوصف
         keypoints, descriptors = sift.detectAndCompute(image, None)
-        
-        # تنظيف الذاكرة
-        gc.collect()
         
         return keypoints, descriptors
         
@@ -34,7 +28,6 @@ def classify_minutiae(image, keypoints):
     Returns:
         list: قائمة تحتوي على أنواع النقاط المميزة
     """
-    device_info = get_device_info()
     minutiae_types = []
     
     for kp in keypoints:
@@ -92,9 +85,6 @@ def match_features(features1, features2):
         
         # حساب نسبة التطابق
         match_score = len(good_matches) / max(len(features1['keypoints']), len(features2['keypoints'])) * 100
-        
-        # تنظيف الذاكرة
-        gc.collect()
         
         return min(match_score, 100.0)
         
