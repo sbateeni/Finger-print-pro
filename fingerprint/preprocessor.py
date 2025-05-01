@@ -3,7 +3,6 @@ import numpy as np
 from scipy import ndimage
 import psutil
 import os
-import torch
 import gc
 
 def get_system_info():
