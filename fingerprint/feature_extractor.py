@@ -31,26 +31,36 @@ def detect_minutiae(image):
         
         # تحليل الكنتورات
         for contour in contours:
-            # حساب خصائص الكنتور
-            area = cv2.contourArea(contour)
-            perimeter = cv2.arcLength(contour, True)
-            approx = cv2.approxPolyDP(contour, 0.02 * perimeter, True)
-            
-            # تصنيف النقاط المميزة
-            if len(approx) == 2:  # نهاية نتوء
-                minutiae['ridge_endings'].append(contour)
-            elif len(approx) == 3:  # تفرع
-                minutiae['bifurcations'].append(contour)
-            elif area < 50:  # نقطة
-                minutiae['dots'].append(contour)
-            elif area < 200:  # جزيرة
-                minutiae['islands'].append(contour)
-            elif len(approx) > 5:  # نواة أو دلتا
-                # تحليل الشكل لتحديد ما إذا كانت نواة أو دلتا
-                if cv2.isContourConvex(approx):
-                    minutiae['cores'].append(contour)
-                else:
-                    minutiae['deltas'].append(contour)
+            try:
+                # حساب خصائص الكنتور
+                area = cv2.contourArea(contour)
+                perimeter = cv2.arcLength(contour, True)
+                
+                # تجاهل الكنتورات الصغيرة جداً
+                if area < 5:
+                    continue
+                    
+                # تقريب الكنتور
+                epsilon = 0.02 * perimeter
+                approx = cv2.approxPolyDP(contour, epsilon, True)
+                
+                # تصنيف النقاط المميزة
+                if len(approx) == 2:  # نهاية نتوء
+                    minutiae['ridge_endings'].append(contour)
+                elif len(approx) == 3:  # تفرع
+                    minutiae['bifurcations'].append(contour)
+                elif area < 50:  # نقطة
+                    minutiae['dots'].append(contour)
+                elif area < 200:  # جزيرة
+                    minutiae['islands'].append(contour)
+                elif len(approx) > 5:  # نواة أو دلتا
+                    # تحليل الشكل لتحديد ما إذا كانت نواة أو دلتا
+                    if cv2.isContourConvex(approx):
+                        minutiae['cores'].append(contour)
+                    else:
+                        minutiae['deltas'].append(contour)
+            except:
+                continue
         
         return minutiae
         

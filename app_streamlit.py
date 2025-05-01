@@ -35,24 +35,33 @@ def draw_minutiae(image, features):
     for minutiae_type, contours in features['minutiae'].items():
         color = colors[minutiae_type]
         for contour in contours:
-            # رسم الكنتور
-            cv2.drawContours(img_with_minutiae, [contour], -1, color, 2)
-            
-            # رسم مركز الكتلة
-            M = cv2.moments(contour)
-            if M["m00"] != 0:
-                cX = int(M["m10"] / M["m00"])
-                cY = int(M["m01"] / M["m00"])
-                cv2.circle(img_with_minutiae, (cX, cY), 5, color, -1)
+            try:
+                # رسم الكنتور
+                cv2.drawContours(img_with_minutiae, [contour], -1, color, 2)
                 
-                # رسم خط اتجاه النقطة المميزة
-                if minutiae_type in ['ridge_endings', 'bifurcations']:
-                    # حساب اتجاه النقطة المميزة
-                    angle = cv2.fitEllipse(contour)[2]
-                    length = 20
-                    endX = int(cX + length * np.cos(np.radians(angle)))
-                    endY = int(cY + length * np.sin(np.radians(angle)))
-                    cv2.arrowedLine(img_with_minutiae, (cX, cY), (endX, endY), color, 2)
+                # رسم مركز الكتلة
+                M = cv2.moments(contour)
+                if M["m00"] != 0:
+                    cX = int(M["m10"] / M["m00"])
+                    cY = int(M["m01"] / M["m00"])
+                    cv2.circle(img_with_minutiae, (cX, cY), 5, color, -1)
+                    
+                    # رسم خط اتجاه النقطة المميزة
+                    if minutiae_type in ['ridge_endings', 'bifurcations']:
+                        try:
+                            # حساب اتجاه النقطة المميزة
+                            if len(contour) >= 5:  # يجب أن يكون هناك 5 نقاط على الأقل لرسم القطع الناقص
+                                ellipse = cv2.fitEllipse(contour)
+                                angle = ellipse[2]
+                                length = 20
+                                endX = int(cX + length * np.cos(np.radians(angle)))
+                                endY = int(cY + length * np.sin(np.radians(angle)))
+                                cv2.arrowedLine(img_with_minutiae, (cX, cY), (endX, endY), color, 2)
+                        except:
+                            # في حالة فشل حساب الاتجاه، نرسم خطاً بسيطاً
+                            cv2.line(img_with_minutiae, (cX-10, cY), (cX+10, cY), color, 2)
+            except:
+                continue
     
     return img_with_minutiae
 
