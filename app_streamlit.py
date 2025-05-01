@@ -13,8 +13,8 @@ import pandas as pd
 # تعيين الحد الأقصى لحجم الصورة (بالبايت)
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
 
-def draw_minutiae(image, features):
-    """رسم النقاط المميزة على الصورة"""
+def draw_minutiae(image, features, matches=None, other_image=None):
+    """رسم النقاط المميزة على الصورة مع خطوط التطابق"""
     if features is None or 'minutiae' not in features:
         return image
         
@@ -60,6 +60,25 @@ def draw_minutiae(image, features):
                         except:
                             # في حالة فشل حساب الاتجاه، نرسم خطاً بسيطاً
                             cv2.line(img_with_minutiae, (cX-10, cY), (cX+10, cY), color, 2)
+            except:
+                continue
+    
+    # رسم خطوط التطابق إذا كانت هناك تطابقات
+    if matches is not None and other_image is not None:
+        for match in matches:
+            try:
+                # الحصول على إحداثيات النقاط المتطابقة
+                pt1 = (int(match[0][0]), int(match[0][1]))
+                pt2 = (int(match[1][0]), int(match[1][1]))
+                
+                # رسم دائرة حول النقطة في الصورة الأولى
+                cv2.circle(img_with_minutiae, pt1, 8, (0, 255, 255), 2)
+                
+                # رسم دائرة حول النقطة في الصورة الثانية
+                cv2.circle(other_image, pt2, 8, (0, 255, 255), 2)
+                
+                # رسم خط التطابق
+                cv2.line(img_with_minutiae, pt1, pt2, (0, 255, 255), 2)
             except:
                 continue
     
@@ -284,6 +303,20 @@ def main():
         .minutiae-table tr:nth-child(even) {
             background-color: #f2f2f2;
         }
+        .matching-lines {
+            position: relative;
+            margin: 2rem 0;
+        }
+        .matching-lines img {
+            max-width: 100%;
+            height: auto;
+        }
+        .matching-lines .line {
+            position: absolute;
+            background-color: rgba(255, 255, 0, 0.5);
+            height: 2px;
+            transform-origin: left center;
+        }
         </style>
     """, unsafe_allow_html=True)
     
@@ -325,12 +358,19 @@ def main():
                     st.markdown('<div class="result-box">', unsafe_allow_html=True)
                     st.markdown("### نتائج المقارنة")
                     
-                    # رسم النقاط المميزة
+                    # رسم النقاط المميزة مع خطوط التطابق
                     img1_with_minutiae = draw_minutiae(processed1, features1)
                     img2_with_minutiae = draw_minutiae(processed2, features2)
                     
-                    # عرض النقاط المميزة
-                    st.markdown("#### النقاط المميزة")
+                    # الحصول على التطابقات
+                    matches = match_features(features1, features2)
+                    
+                    # رسم خطوط التطابق
+                    img1_with_matches = draw_minutiae(img1_with_minutiae, features1, matches, img2_with_minutiae)
+                    img2_with_matches = draw_minutiae(img2_with_minutiae, features2, matches, img1_with_minutiae)
+                    
+                    # عرض النقاط المميزة مع خطوط التطابق
+                    st.markdown("#### النقاط المميزة وخطوط التطابق")
                     st.markdown("""
                     <div class="minutiae-legend">
                         <div class="minutiae-item">
@@ -357,6 +397,10 @@ def main():
                             <div class="minutiae-color" style="background-color: rgb(0, 255, 255);"></div>
                             <span>دلتا</span>
                         </div>
+                        <div class="minutiae-item">
+                            <div class="minutiae-color" style="background-color: rgb(255, 255, 0);"></div>
+                            <span>خطوط التطابق</span>
+                        </div>
                     </div>
                     """, unsafe_allow_html=True)
                     
@@ -364,7 +408,7 @@ def main():
                     
                     with col1:
                         st.markdown('<div class="image-container">', unsafe_allow_html=True)
-                        st.image(img1_with_minutiae, caption="البصمة الأولى مع النقاط المميزة", use_container_width=True)
+                        st.image(img1_with_matches, caption="البصمة الأولى مع النقاط المميزة وخطوط التطابق", use_container_width=True)
                         st.markdown('</div>', unsafe_allow_html=True)
                         quality1 = calculate_quality(processed1)
                         st.markdown(f'<div class="quality-score">جودة البصمة الأولى: {quality1:.2f}%</div>', unsafe_allow_html=True)
@@ -374,7 +418,7 @@ def main():
                         
                     with col2:
                         st.markdown('<div class="image-container">', unsafe_allow_html=True)
-                        st.image(img2_with_minutiae, caption="البصمة الثانية مع النقاط المميزة", use_container_width=True)
+                        st.image(img2_with_matches, caption="البصمة الثانية مع النقاط المميزة وخطوط التطابق", use_container_width=True)
                         st.markdown('</div>', unsafe_allow_html=True)
                         quality2 = calculate_quality(processed2)
                         st.markdown(f'<div class="quality-score">جودة البصمة الثانية: {quality2:.2f}%</div>', unsafe_allow_html=True)

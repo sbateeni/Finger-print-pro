@@ -148,11 +148,11 @@ def match_features(features1, features2):
     """مقارنة مميزات بصمتين"""
     try:
         if features1 is None or features2 is None:
-            return 0.0
+            return 0.0, []
             
         # التحقق من وجود المميزات
         if not features1['keypoints'] or not features2['keypoints']:
-            return 0.0
+            return 0.0, []
             
         # إنشاء FLANN matcher
         FLANN_INDEX_KDTREE = 1
@@ -175,8 +175,15 @@ def match_features(features1, features2):
         else:
             match_score = 0.0
             
-        return match_score
+        # تحضير التطابقات للعرض
+        matches_for_display = []
+        for match in good_matches:
+            pt1 = features1['keypoints'][match.queryIdx].pt
+            pt2 = features2['keypoints'][match.trainIdx].pt
+            matches_for_display.append((pt1, pt2))
+            
+        return match_score, matches_for_display
         
     except Exception as e:
         print(f"خطأ في مقارنة المميزات: {str(e)}")
-        return 0.0 
+        return 0.0, [] 
