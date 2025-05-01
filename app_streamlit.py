@@ -8,9 +8,118 @@ from fingerprint.preprocessor import preprocess_image
 from fingerprint.feature_extractor import extract_features, match_features
 from fingerprint.quality import calculate_quality
 import gc
+import pandas as pd
 
 # تعيين الحد الأقصى لحجم الصورة (بالبايت)
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
+
+def draw_minutiae(image, features):
+    """رسم النقاط المميزة على الصورة"""
+    if features is None or 'minutiae' not in features:
+        return image
+        
+    # نسخ الصورة
+    img_with_minutiae = image.copy()
+    
+    # ألوان النقاط المميزة
+    colors = {
+        'ridge_endings': (0, 255, 0),    # أخضر
+        'bifurcations': (255, 0, 0),     # أزرق
+        'islands': (0, 0, 255),          # أحمر
+        'dots': (255, 255, 0),           # أصفر
+        'cores': (255, 0, 255),          # وردي
+        'deltas': (0, 255, 255)          # سماوي
+    }
+    
+    # رسم النقاط المميزة
+    for minutiae_type, contours in features['minutiae'].items():
+        color = colors[minutiae_type]
+        for contour in contours:
+            # رسم الكنتور
+            cv2.drawContours(img_with_minutiae, [contour], -1, color, 2)
+            
+            # رسم مركز الكتلة
+            M = cv2.moments(contour)
+            if M["m00"] != 0:
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+                cv2.circle(img_with_minutiae, (cX, cY), 5, color, -1)
+                
+                # رسم خط اتجاه النقطة المميزة
+                if minutiae_type in ['ridge_endings', 'bifurcations']:
+                    # حساب اتجاه النقطة المميزة
+                    angle = cv2.fitEllipse(contour)[2]
+                    length = 20
+                    endX = int(cX + length * np.cos(np.radians(angle)))
+                    endY = int(cY + length * np.sin(np.radians(angle)))
+                    cv2.arrowedLine(img_with_minutiae, (cX, cY), (endX, endY), color, 2)
+    
+    return img_with_minutiae
+
+def create_minutiae_table(features):
+    """إنشاء جدول للنقاط المميزة"""
+    if features is None or 'minutiae' not in features:
+        return None
+        
+    data = []
+    for minutiae_type, contours in features['minutiae'].items():
+        for contour in contours:
+            M = cv2.moments(contour)
+            if M["m00"] != 0:
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+                area = cv2.contourArea(contour)
+                perimeter = cv2.arcLength(contour, True)
+                
+                # حساب التوجه
+                angle = 0
+                if minutiae_type in ['ridge_endings', 'bifurcations']:
+                    angle = cv2.fitEllipse(contour)[2]
+                
+                data.append({
+                    'النوع': minutiae_type,
+                    'الموقع (X,Y)': f'({cX}, {cY})',
+                    'المساحة': f'{area:.2f}',
+                    'المحيط': f'{perimeter:.2f}',
+                    'التوجه': f'{angle:.2f}°'
+                })
+    
+    return pd.DataFrame(data)
+
+def show_minutiae_details(features):
+    """عرض تفاصيل النقاط المميزة"""
+    if features is None or 'minutiae' not in features:
+        return
+        
+    # عرض إحصائيات النقاط المميزة
+    st.markdown("#### إحصائيات النقاط المميزة")
+    stats = {
+        'نهاية نتوء': len(features['minutiae']['ridge_endings']),
+        'تفرع': len(features['minutiae']['bifurcations']),
+        'جزيرة': len(features['minutiae']['islands']),
+        'نقطة': len(features['minutiae']['dots']),
+        'نواة': len(features['minutiae']['cores']),
+        'دلتا': len(features['minutiae']['deltas'])
+    }
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("نهايات النتوءات", stats['نهاية نتوء'])
+        st.metric("التفرعات", stats['تفرع'])
+    with col2:
+        st.metric("الجزر", stats['جزيرة'])
+        st.metric("النقاط", stats['نقطة'])
+    with col3:
+        st.metric("النوى", stats['نواة'])
+        st.metric("الدلتا", stats['دلتا'])
+    
+    # عرض جدول النقاط المميزة
+    st.markdown("#### تفاصيل النقاط المميزة")
+    df = create_minutiae_table(features)
+    if df is not None:
+        st.markdown('<div class="minutiae-table">', unsafe_allow_html=True)
+        st.table(df)
+        st.markdown('</div>', unsafe_allow_html=True)
 
 def process_image(image):
     """معالجة صورة البصمة"""
@@ -26,12 +135,12 @@ def process_image(image):
         processed = preprocess_image(img_array)
         
         # استخراج المميزات
-        keypoints, descriptors = extract_features(processed)
+        features = extract_features(processed)
         
         # تنظيف الذاكرة
         gc.collect()
             
-        return processed, {'keypoints': keypoints, 'descriptors': descriptors}
+        return processed, features
         
     except Exception as e:
         st.error(f"حدث خطأ أثناء معالجة الصورة: {str(e)}")
@@ -128,6 +237,44 @@ def main():
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
+        .minutiae-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+        .minutiae-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .minutiae-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+        }
+        .minutiae-table {
+            margin: 1rem 0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .minutiae-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .minutiae-table th {
+            background-color: #3498db;
+            color: white;
+            padding: 0.5rem;
+            text-align: right;
+        }
+        .minutiae-table td {
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+        }
+        .minutiae-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
         </style>
     """, unsafe_allow_html=True)
     
@@ -169,21 +316,62 @@ def main():
                     st.markdown('<div class="result-box">', unsafe_allow_html=True)
                     st.markdown("### نتائج المقارنة")
                     
+                    # رسم النقاط المميزة
+                    img1_with_minutiae = draw_minutiae(processed1, features1)
+                    img2_with_minutiae = draw_minutiae(processed2, features2)
+                    
+                    # عرض النقاط المميزة
+                    st.markdown("#### النقاط المميزة")
+                    st.markdown("""
+                    <div class="minutiae-legend">
+                        <div class="minutiae-item">
+                            <div class="minutiae-color" style="background-color: rgb(0, 255, 0);"></div>
+                            <span>نهاية نتوء</span>
+                        </div>
+                        <div class="minutiae-item">
+                            <div class="minutiae-color" style="background-color: rgb(255, 0, 0);"></div>
+                            <span>تفرع</span>
+                        </div>
+                        <div class="minutiae-item">
+                            <div class="minutiae-color" style="background-color: rgb(0, 0, 255);"></div>
+                            <span>جزيرة</span>
+                        </div>
+                        <div class="minutiae-item">
+                            <div class="minutiae-color" style="background-color: rgb(255, 255, 0);"></div>
+                            <span>نقطة</span>
+                        </div>
+                        <div class="minutiae-item">
+                            <div class="minutiae-color" style="background-color: rgb(255, 0, 255);"></div>
+                            <span>نواة</span>
+                        </div>
+                        <div class="minutiae-item">
+                            <div class="minutiae-color" style="background-color: rgb(0, 255, 255);"></div>
+                            <span>دلتا</span>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
                     col1, col2 = st.columns(2)
                     
                     with col1:
                         st.markdown('<div class="image-container">', unsafe_allow_html=True)
-                        st.image(processed1, caption="البصمة الأولى بعد المعالجة", use_container_width=True)
+                        st.image(img1_with_minutiae, caption="البصمة الأولى مع النقاط المميزة", use_container_width=True)
                         st.markdown('</div>', unsafe_allow_html=True)
                         quality1 = calculate_quality(processed1)
                         st.markdown(f'<div class="quality-score">جودة البصمة الأولى: {quality1:.2f}%</div>', unsafe_allow_html=True)
                         
+                        # عرض تفاصيل النقاط المميزة للبصمة الأولى
+                        show_minutiae_details(features1)
+                        
                     with col2:
                         st.markdown('<div class="image-container">', unsafe_allow_html=True)
-                        st.image(processed2, caption="البصمة الثانية بعد المعالجة", use_container_width=True)
+                        st.image(img2_with_minutiae, caption="البصمة الثانية مع النقاط المميزة", use_container_width=True)
                         st.markdown('</div>', unsafe_allow_html=True)
                         quality2 = calculate_quality(processed2)
                         st.markdown(f'<div class="quality-score">جودة البصمة الثانية: {quality2:.2f}%</div>', unsafe_allow_html=True)
+                        
+                        # عرض تفاصيل النقاط المميزة للبصمة الثانية
+                        show_minutiae_details(features2)
                     
                     # مقارنة البصمات
                     if features1 and features2:
