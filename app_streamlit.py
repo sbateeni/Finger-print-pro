@@ -11,7 +11,7 @@ import gc
 import pandas as pd
 
 # تعيين الحد الأقصى لحجم الصورة (بالبايت)
-MAX_IMAGE_SIZE = 50 * 1024 * 1024  # 5MB
+MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5MB
 
 def draw_minutiae(image, features, matches=None, other_image=None):
     """رسم النقاط المميزة على الصورة مع خطوط التطابق"""
