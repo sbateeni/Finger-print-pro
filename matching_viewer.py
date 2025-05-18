@@ -4,6 +4,8 @@ import numpy as np
 from PIL import Image
 import io
 import base64
+import json
+import os
 from fingerprint.preprocessor import preprocess_image
 from fingerprint.feature_extractor import extract_features, match_features, detect_minutiae
 from fingerprint.quality import calculate_quality
@@ -117,49 +119,99 @@ def create_matching_image(image1, image2, matches):
     
     return matching_image
 
+def save_features_to_json(features, filename):
+    """حفظ السمات بتنسيق JSON"""
+    # تحويل الكنتورات إلى قوائم
+    minutiae_data = {}
+    for type_name, contours in features['minutiae'].items():
+        minutiae_data[type_name] = []
+        for contour in contours:
+            M = cv2.moments(contour)
+            if M["m00"] != 0:
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+                minutiae_data[type_name].append({
+                    'x': cX,
+                    'y': cY,
+                    'type': type_name
+                })
+    
+    # حفظ البيانات
+    with open(filename, 'w') as f:
+        json.dump(minutiae_data, f)
+
+def process_image_stages(image_file):
+    """معالجة الصورة عبر جميع المراحل"""
+    stages = {}
+    
+    # 🖼️ المرحلة 1: معالجة الصورة
+    with st.spinner("جاري معالجة الصورة..."):
+        processed = preprocess_image(image_file)
+        if processed is not None:
+            stages['processed'] = processed
+    
+    # 📍 المرحلة 2: استخراج السمات
+    if 'processed' in stages:
+        with st.spinner("جاري استخراج السمات..."):
+            features = extract_features(stages['processed'])
+            if features is not None:
+                stages['features'] = features
+    
+    # 📁 المرحلة 3: حفظ السمات
+    if 'features' in stages:
+        with st.spinner("جاري حفظ السمات..."):
+            filename = f"features_{hash(str(image_file))}.json"
+            save_features_to_json(stages['features'], filename)
+            stages['saved_features'] = filename
+    
+    return stages
+
+def show_minutiae_details(features):
+    """عرض تفاصيل النقاط المميزة"""
+    if features is None or 'minutiae' not in features:
+        return
+        
+    # إنشاء جدول للإحصائيات
+    stats = {
+        'نهاية نتوء': len(features['minutiae'].get('ridge_endings', [])),
+        'تفرع': len(features['minutiae'].get('bifurcations', [])),
+        'جزيرة': len(features['minutiae'].get('islands', [])),
+        'نقطة': len(features['minutiae'].get('dots', [])),
+        'نواة': len(features['minutiae'].get('cores', [])),
+        'دلتا': len(features['minutiae'].get('deltas', []))
+    }
+    
+    # عرض الإحصائيات
+    st.markdown("#### إحصائيات النقاط المميزة")
+    for type_name, count in stats.items():
+        st.markdown(f"- {type_name}: {count}")
+
 def main():
     st.set_page_config(
-        page_title="عرض التطابقات بين البصمات",
+        page_title="نظام مقارنة البصمات",
         page_icon="👆",
         layout="wide"
     )
     
     st.markdown("""
         <style>
-        .matching-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin: 2rem 0;
-        }
-        .matching-image {
-            max-width: 100%;
-            height: auto;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        .match-info {
-            margin: 1rem 0;
+        .stage-container {
             padding: 1rem;
-            background-color: #f8f9fa;
-            border-radius: 10px;
-            text-align: center;
-        }
-        .minutiae-legend {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 1rem;
             margin: 1rem 0;
+            border-radius: 10px;
+            background-color: #f8f9fa;
         }
-        .minutiae-item {
+        .stage-title {
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            margin-bottom: 1rem;
         }
-        .minutiae-color {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
+        .stage-icon {
+            font-size: 1.5rem;
+        }
+        .stage-content {
+            margin-left: 2rem;
         }
         .fingerprint-grid {
             display: grid;
@@ -176,128 +228,118 @@ def main():
             border-radius: 10px;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
+        .match-info {
+            margin: 1rem 0;
+            padding: 1rem;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            text-align: center;
+        }
         </style>
     """, unsafe_allow_html=True)
     
-    st.markdown('<h1 style="text-align: center;">عرض التطابقات بين البصمات</h1>', unsafe_allow_html=True)
+    st.markdown('<h1 style="text-align: center;">نظام مقارنة البصمات</h1>', unsafe_allow_html=True)
     
     # تحميل الصور
     st.markdown("### تحميل البصمات")
     uploaded_files = st.file_uploader("اختر البصمات للمقارنة", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
     
-    if st.button("عرض التطابقات"):
+    if st.button("بدء المعالجة"):
         if uploaded_files and len(uploaded_files) >= 2:
-            with st.spinner("جاري معالجة البصمات..."):
-                # معالجة البصمات
-                processed_images = []
-                features_list = []
+            # معالجة كل بصمة
+            processed_stages = []
+            for file in uploaded_files:
+                stages = process_image_stages(file)
+                processed_stages.append(stages)
+            
+            # عرض نتائج كل مرحلة
+            for i, stages in enumerate(processed_stages):
+                st.markdown(f'<div class="stage-container">', unsafe_allow_html=True)
+                st.markdown(f'<h3>البصمة {i+1}</h3>', unsafe_allow_html=True)
                 
-                for file in uploaded_files:
-                    processed, features = process_image(file)
-                    if processed is not None and features is not None:
-                        processed_images.append(processed)
-                        features_list.append(features)
+                # 🖼️ عرض مرحلة معالجة الصورة
+                if 'processed' in stages:
+                    st.markdown('<div class="stage-title"><span class="stage-icon">🖼️</span> معالجة الصورة</div>', unsafe_allow_html=True)
+                    st.image(stages['processed'], use_container_width=True)
                 
-                if len(processed_images) >= 2:
-                    # عرض النتائج
-                    st.markdown('<div class="matching-container">', unsafe_allow_html=True)
+                # 📍 عرض مرحلة استخراج السمات
+                if 'features' in stages:
+                    st.markdown('<div class="stage-title"><span class="stage-icon">📍</span> استخراج السمات</div>', unsafe_allow_html=True)
+                    img_with_minutiae = draw_minutiae_with_matches(stages['processed'], stages['features'])
+                    st.image(img_with_minutiae, use_container_width=True)
                     
-                    # عرض النقاط المميزة مع خطوط التطابق
-                    st.markdown("#### النقاط المميزة وخطوط التطابق")
-                    st.markdown("""
-                    <div class="minutiae-legend">
-                        <div class="minutiae-item">
-                            <div class="minutiae-color" style="background-color: rgb(0, 255, 0);"></div>
-                            <span>نهاية نتوء</span>
-                        </div>
-                        <div class="minutiae-item">
-                            <div class="minutiae-color" style="background-color: rgb(255, 0, 0);"></div>
-                            <span>تفرع</span>
-                        </div>
-                        <div class="minutiae-item">
-                            <div class="minutiae-color" style="background-color: rgb(0, 0, 255);"></div>
-                            <span>جزيرة</span>
-                        </div>
-                        <div class="minutiae-item">
-                            <div class="minutiae-color" style="background-color: rgb(255, 255, 0);"></div>
-                            <span>نقطة</span>
-                        </div>
-                        <div class="minutiae-item">
-                            <div class="minutiae-color" style="background-color: rgb(255, 0, 255);"></div>
-                            <span>نواة</span>
-                        </div>
-                        <div class="minutiae-item">
-                            <div class="minutiae-color" style="background-color: rgb(0, 255, 255);"></div>
-                            <span>دلتا</span>
-                        </div>
-                        <div class="minutiae-item">
-                            <div class="minutiae-color" style="background-color: rgb(255, 255, 0);"></div>
-                            <span>خطوط التطابق</span>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                    
-                    # عرض البصمات مع النقاط المميزة
-                    st.markdown("### البصمات مع النقاط المميزة")
-                    st.markdown('<div class="fingerprint-grid">', unsafe_allow_html=True)
-                    
-                    for i, (img, features) in enumerate(zip(processed_images, features_list)):
-                        with st.container():
-                            st.markdown(f'<div class="fingerprint-item">', unsafe_allow_html=True)
-                            st.markdown(f"#### البصمة {i+1}")
-                            
-                            # رسم النقاط المميزة
-                            img_with_minutiae = draw_minutiae_with_matches(img, features)
-                            st.image(img_with_minutiae, use_container_width=True)
-                            
-                            # عرض جودة البصمة
-                            quality = calculate_quality(img)
-                            st.markdown(f'<div class="quality-score">جودة البصمة: {quality:.2f}%</div>', unsafe_allow_html=True)
-                            
-                            # عرض إحصائيات النقاط المميزة
-                            show_minutiae_details(features)
-                            
-                            st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    # عرض التطابقات بين كل زوج من البصمات
-                    st.markdown("### التطابقات بين البصمات")
-                    
-                    for i in range(len(processed_images)):
-                        for j in range(i+1, len(processed_images)):
-                            st.markdown(f"#### مقارنة البصمة {i+1} مع البصمة {j+1}")
-                            
-                            # الحصول على التطابقات
-                            match_score, matches = match_features(features_list[i], features_list[j])
-                            
-                            # إنشاء صورة التطابقات
-                            matching_image = create_matching_image(processed_images[i], processed_images[j], matches)
-                            
-                            # عرض صورة التطابقات
-                            st.markdown('<div class="match-info">', unsafe_allow_html=True)
-                            st.markdown(f"نسبة التطابق: {match_score:.2f}%")
-                            st.markdown('</div>', unsafe_allow_html=True)
-                            
-                            st.image(matching_image, use_container_width=True)
-                            
-                            # عرض تفاصيل التطابقات
-                            st.markdown(f"عدد النقاط المتطابقة: {len(matches)}")
-                            
-                            # عرض جدول التطابقات
-                            matches_data = []
-                            for k, match in enumerate(matches):
-                                matches_data.append({
-                                    "رقم التطابق": k+1,
-                                    f"إحداثيات البصمة {i+1}": f"({int(match[0][0])}, {int(match[0][1])})",
-                                    f"إحداثيات البصمة {j+1}": f"({int(match[1][0])}, {int(match[1][1])})"
-                                })
-                            
-                            st.table(matches_data)
-                    
-                    st.markdown('</div>', unsafe_allow_html=True)
-                else:
-                    st.error("حدث خطأ أثناء معالجة البصمات")
+                    # عرض إحصائيات السمات
+                    show_minutiae_details(stages['features'])
+                
+                # 📁 عرض مرحلة حفظ السمات
+                if 'saved_features' in stages:
+                    st.markdown('<div class="stage-title"><span class="stage-icon">📁</span> حفظ السمات</div>', unsafe_allow_html=True)
+                    st.markdown(f"تم حفظ السمات في الملف: `{stages['saved_features']}`")
+                
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            # 🔍 عرض مرحلة مطابقة البصمات
+            st.markdown('<div class="stage-container">', unsafe_allow_html=True)
+            st.markdown('<div class="stage-title"><span class="stage-icon">🔍</span> مطابقة البصمات</div>', unsafe_allow_html=True)
+            
+            for i in range(len(processed_stages)):
+                for j in range(i+1, len(processed_stages)):
+                    if 'features' in processed_stages[i] and 'features' in processed_stages[j]:
+                        st.markdown(f"#### مقارنة البصمة {i+1} مع البصمة {j+1}")
+                        
+                        # حساب التطابق
+                        match_score, matches = match_features(
+                            processed_stages[i]['features'],
+                            processed_stages[j]['features']
+                        )
+                        
+                        # إنشاء صورة التطابق
+                        matching_image = create_matching_image(
+                            processed_stages[i]['processed'],
+                            processed_stages[j]['processed'],
+                            matches
+                        )
+                        
+                        # عرض النتائج
+                        st.markdown('<div class="match-info">', unsafe_allow_html=True)
+                        st.markdown(f"نسبة التطابق: {match_score:.2f}%")
+                        st.markdown(f"عدد النقاط المتطابقة: {len(matches)}")
+                        st.markdown('</div>', unsafe_allow_html=True)
+                        
+                        st.image(matching_image, use_container_width=True)
+                        
+                        # عرض جدول التطابقات
+                        matches_data = []
+                        for k, match in enumerate(matches):
+                            matches_data.append({
+                                "رقم التطابق": k+1,
+                                f"إحداثيات البصمة {i+1}": f"({int(match[0][0])}, {int(match[0][1])})",
+                                f"إحداثيات البصمة {j+1}": f"({int(match[1][0])}, {int(match[1][1])})"
+                            })
+                        
+                        st.table(matches_data)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # 📊 عرض مرحلة التحليل
+            st.markdown('<div class="stage-container">', unsafe_allow_html=True)
+            st.markdown('<div class="stage-title"><span class="stage-icon">📊</span> التحليل والإحصائيات</div>', unsafe_allow_html=True)
+            
+            # عرض إحصائيات عامة
+            total_minutiae = sum(len(stages.get('features', {}).get('minutiae', {}).get(type_name, [])) 
+                               for stages in processed_stages 
+                               for type_name in ['ridge_endings', 'bifurcations', 'islands', 'dots', 'cores', 'deltas'])
+            
+            st.markdown(f"إجمالي عدد النقاط المميزة: {total_minutiae}")
+            
+            # عرض جودة كل بصمة
+            for i, stages in enumerate(processed_stages):
+                if 'processed' in stages:
+                    quality = calculate_quality(stages['processed'])
+                    st.markdown(f"جودة البصمة {i+1}: {quality:.2f}%")
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+            
         else:
             st.error("الرجاء اختيار بصمتين على الأقل للمقارنة")
 
