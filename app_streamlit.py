@@ -15,6 +15,14 @@ import gc
 import pandas as pd
 import matplotlib.pyplot as plt
 
+# تعيين إعدادات الصفحة
+st.set_page_config(
+    page_title="نظام مقارنة البصمات",
+    page_icon="👆",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 # تعيين المسارات
 DATA_DIR = "data"
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -365,14 +373,6 @@ def show_advanced_analysis(stages):
                 st.error(f"حدث خطأ في عرض تحليل الاتجاهات: {str(e)}")
 
 def main():
-    st.set_page_config(
-        page_title="نظام مقارنة البصمات",
-        page_icon="👆",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
-    
-    # تنسيق CSS مخصص
     st.markdown("""
         <style>
         .main {
