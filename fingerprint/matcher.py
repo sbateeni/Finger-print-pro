@@ -5,6 +5,7 @@ from scipy.spatial.distance import cosine
 import torch
 import gc
 from .preprocessor import get_device_info
+import streamlit as st
 
 def match_fingerprints(features1, features2, threshold=0.3):
     """
@@ -308,4 +309,118 @@ def compare_fingerprints(fp1_features, fp2_features):
     # تنظيف الذاكرة
     gc.collect()
     
-    return match_score 
+    return match_score
+
+def create_advanced_matching_image(image1, image2, features1, features2, matches):
+    """إنشاء صورة متقدمة للمطابقة"""
+    # إنشاء صورة تجمع بين البصمتين
+    h1, w1 = image1.shape[:2]
+    h2, w2 = image2.shape[:2]
+    max_h = max(h1, h2)
+    total_w = w1 + w2
+    matching_image = np.zeros((max_h, total_w, 3), dtype=np.uint8)
+    
+    # وضع البصمتين في الصورة
+    matching_image[:h1, :w1] = cv2.cvtColor(image1, cv2.COLOR_GRAY2BGR)
+    matching_image[:h2, w1:] = cv2.cvtColor(image2, cv2.COLOR_GRAY2BGR)
+    
+    # رسم النقاط المميزة
+    colors = {
+        'ridge_endings': (0, 255, 0),    # أخضر
+        'bifurcations': (255, 0, 0),     # أزرق
+        'islands': (0, 0, 255),          # أحمر
+        'dots': (255, 255, 0),           # أصفر
+        'cores': (255, 0, 255),          # وردي
+        'deltas': (0, 255, 255)          # سماوي
+    }
+    
+    # رسم النقاط المميزة للبصمة الأولى
+    for type_name, contours in features1.get('minutiae', {}).items():
+        color = colors[type_name]
+        for contour in contours:
+            try:
+                cv2.drawContours(matching_image, [contour], -1, color, 2)
+                M = cv2.moments(contour)
+                if M["m00"] != 0:
+                    cX = int(M["m10"] / M["m00"])
+                    cY = int(M["m01"] / M["m00"])
+                    cv2.circle(matching_image, (cX, cY), 5, color, -1)
+            except:
+                continue
+    
+    # رسم النقاط المميزة للبصمة الثانية
+    for type_name, contours in features2.get('minutiae', {}).items():
+        color = colors[type_name]
+        for contour in contours:
+            try:
+                contour_shifted = contour + np.array([w1, 0])
+                cv2.drawContours(matching_image, [contour_shifted], -1, color, 2)
+                M = cv2.moments(contour)
+                if M["m00"] != 0:
+                    cX = int(M["m10"] / M["m00"]) + w1
+                    cY = int(M["m01"] / M["m00"])
+                    cv2.circle(matching_image, (cX, cY), 5, color, -1)
+            except:
+                continue
+    
+    # رسم خطوط التطابق
+    for i, match in enumerate(matches):
+        try:
+            pt1 = (int(match[0][0]), int(match[0][1]))
+            pt2 = (int(match[1][0]) + w1, int(match[1][1]))
+            
+            # رسم دائرة حول النقاط المتطابقة
+            cv2.circle(matching_image, pt1, 8, (0, 255, 255), 2)
+            cv2.circle(matching_image, pt2, 8, (0, 255, 255), 2)
+            
+            # رسم خط التطابق
+            cv2.line(matching_image, pt1, pt2, (0, 255, 255), 2)
+            
+            # رسم رقم التطابق
+            cv2.putText(matching_image, str(i+1), 
+                       (pt1[0]-10, pt1[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+            cv2.putText(matching_image, str(i+1), 
+                       (pt2[0]-10, pt2[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+        except:
+            continue
+    
+    return matching_image
+
+def show_matching_results(stages1, stages2, match_score, matches):
+    """عرض نتائج المطابقة"""
+    st.markdown("#### نتائج المطابقة")
+    
+    # عرض نسبة التطابق
+    st.markdown(f"نسبة التطابق: {match_score:.2f}%")
+    st.markdown(f"عدد النقاط المتطابقة: {len(matches)}")
+    
+    # عرض نتيجة المطابقة
+    if match_score > 80:
+        st.markdown('<div class="match-result match">البصمتان متطابقتان</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="match-result no-match">البصمتان غير متطابقتين</div>', unsafe_allow_html=True)
+    
+    # إنشاء صورة المطابقة المتقدمة
+    matching_image = create_advanced_matching_image(
+        stages1['processed'],
+        stages2['processed'],
+        stages1['features'],
+        stages2['features'],
+        matches
+    )
+    
+    # عرض صورة المطابقة
+    st.image(matching_image, use_container_width=True)
+    
+    # عرض تفاصيل التطابق
+    st.markdown("#### تفاصيل التطابق")
+    matches_data = []
+    for i, match in enumerate(matches):
+        matches_data.append({
+            "رقم التطابق": i+1,
+            "إحداثيات البصمة 1": f"({int(match[0][0])}, {int(match[0][1])})",
+            "إحداثيات البصمة 2": f"({int(match[1][0])}, {int(match[1][1])})",
+            "المسافة": f"{np.sqrt((match[0][0]-match[1][0])**2 + (match[0][1]-match[1][1])**2):.2f}"
+        })
+    
+    st.table(matches_data) 
