@@ -40,12 +40,19 @@ def process_image_stages(image_file):
         img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
         
         if img is None:
+            st.error("فشل في قراءة الصورة")
             return stages
             
         # 🖼️ المرحلة 1: معالجة الصورة
         with st.spinner("جاري معالجة الصورة..."):
-            # تحويل إلى تدرج رمادي
-            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            # التحقق من عدد القنوات وتحويلها إذا لزم الأمر
+            if len(img.shape) == 2:  # صورة بتدرج رمادي
+                gray = img
+            elif len(img.shape) == 3:  # صورة ملونة
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            else:
+                st.error("تنسيق الصورة غير مدعوم")
+                return stages
             
             # تحسين التباين
             clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
