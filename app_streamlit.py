@@ -15,6 +15,10 @@ import gc
 import pandas as pd
 import matplotlib.pyplot as plt
 
+# تعيين المسارات
+DATA_DIR = "data"
+os.makedirs(DATA_DIR, exist_ok=True)
+
 # تعيين الحد الأقصى لحجم الصورة (بالبايت)
 MAX_IMAGE_SIZE = 8 * 1024 * 1024  # 8MB
 
@@ -58,7 +62,7 @@ def process_image_stages(image_file):
         # 📁 المرحلة 3: حفظ السمات
         if 'features' in stages:
             with st.spinner("جاري حفظ السمات..."):
-                filename = f"features_{hash(str(image_file.name))}.json"
+                filename = os.path.join(DATA_DIR, f"features_{hash(str(image_file.name))}.json")
                 save_features_to_json(stages['features'], filename)
                 stages['saved_features'] = filename
         
