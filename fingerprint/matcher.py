@@ -2,10 +2,15 @@ import cv2
 import numpy as np
 from .feature_extractor import match_features
 from scipy.spatial.distance import cosine
-import torch
-import gc
-from .preprocessor import get_device_info
 import streamlit as st
+from typing import Dict, List, Tuple, Optional
+
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    st.warning("PyTorch is not available. Some advanced features may be limited.")
 
 def match_fingerprints(features1, features2, threshold=0.3):
     """
