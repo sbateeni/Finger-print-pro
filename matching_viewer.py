@@ -144,27 +144,50 @@ def process_image_stages(image_file):
     """معالجة الصورة عبر جميع المراحل"""
     stages = {}
     
-    # 🖼️ المرحلة 1: معالجة الصورة
-    with st.spinner("جاري معالجة الصورة..."):
-        processed = preprocess_image(image_file)
-        if processed is not None:
-            stages['processed'] = processed
-    
-    # 📍 المرحلة 2: استخراج السمات
-    if 'processed' in stages:
-        with st.spinner("جاري استخراج السمات..."):
-            features = extract_features(stages['processed'])
-            if features is not None:
-                stages['features'] = features
-    
-    # 📁 المرحلة 3: حفظ السمات
-    if 'features' in stages:
-        with st.spinner("جاري حفظ السمات..."):
-            filename = f"features_{hash(str(image_file))}.json"
-            save_features_to_json(stages['features'], filename)
-            stages['saved_features'] = filename
-    
-    return stages
+    try:
+        # تحويل ملف Streamlit إلى صورة OpenCV
+        file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
+        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            return stages
+            
+        # 🖼️ المرحلة 1: معالجة الصورة
+        with st.spinner("جاري معالجة الصورة..."):
+            # تحويل إلى تدرج رمادي
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            
+            # تحسين التباين
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+            enhanced = clahe.apply(gray)
+            
+            # تخفيف الضوضاء
+            denoised = cv2.fastNlMeansDenoising(enhanced)
+            
+            # تحسين الحواف
+            edges = cv2.Canny(denoised, 100, 200)
+            
+            stages['processed'] = denoised
+            stages['edges'] = edges
+        
+        # 📍 المرحلة 2: استخراج السمات
+        if 'processed' in stages:
+            with st.spinner("جاري استخراج السمات..."):
+                features = extract_features(stages['processed'])
+                if features is not None:
+                    stages['features'] = features
+        
+        # 📁 المرحلة 3: حفظ السمات
+        if 'features' in stages:
+            with st.spinner("جاري حفظ السمات..."):
+                filename = f"features_{hash(str(image_file.name))}.json"
+                save_features_to_json(stages['features'], filename)
+                stages['saved_features'] = filename
+        
+        return stages
+    except Exception as e:
+        st.error(f"حدث خطأ أثناء معالجة الصورة: {str(e)}")
+        return stages
 
 def show_minutiae_details(features):
     """عرض تفاصيل النقاط المميزة"""
@@ -249,6 +272,8 @@ def main():
             # معالجة كل بصمة
             processed_stages = []
             for file in uploaded_files:
+                # إعادة تعيين مؤشر الملف
+                file.seek(0)
                 stages = process_image_stages(file)
                 processed_stages.append(stages)
             
@@ -261,6 +286,10 @@ def main():
                 if 'processed' in stages:
                     st.markdown('<div class="stage-title"><span class="stage-icon">🖼️</span> معالجة الصورة</div>', unsafe_allow_html=True)
                     st.image(stages['processed'], use_container_width=True)
+                    
+                    if 'edges' in stages:
+                        st.markdown("#### حواف البصمة")
+                        st.image(stages['edges'], use_container_width=True)
                 
                 # 📍 عرض مرحلة استخراج السمات
                 if 'features' in stages:
