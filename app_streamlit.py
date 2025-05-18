@@ -190,6 +190,9 @@ def analyze_fingerprint_details(image, features):
         fft = np.fft.fft2(image)
         fft_shift = np.fft.fftshift(fft)
         magnitude_spectrum = 20 * np.log(np.abs(fft_shift) + 1)
+        
+        # تحويل القيم إلى نطاق [0, 1]
+        magnitude_spectrum = (magnitude_spectrum - magnitude_spectrum.min()) / (magnitude_spectrum.max() - magnitude_spectrum.min())
         details['frequency_analysis'] = magnitude_spectrum
         
         # تحليل الاتجاهات
@@ -335,17 +338,25 @@ def show_advanced_analysis(stages):
         # عرض تحليل الترددات
         if 'frequency_analysis' in details:
             st.markdown("#### تحليل الترددات")
-            st.image(details['frequency_analysis'], use_container_width=True)
+            try:
+                # تحويل الصورة إلى تنسيق مناسب للعرض
+                freq_image = (details['frequency_analysis'] * 255).astype(np.uint8)
+                st.image(freq_image, use_container_width=True)
+            except Exception as e:
+                st.error(f"حدث خطأ في عرض تحليل الترددات: {str(e)}")
         
         # عرض تحليل الاتجاهات
         if 'directions' in details and details['directions']:
             st.markdown("#### تحليل الاتجاهات")
-            fig = plt.figure(figsize=(10, 4))
-            plt.hist(details['directions'], bins=36, range=(0, 360))
-            plt.title("توزيع اتجاهات النقاط المميزة")
-            plt.xlabel("الزاوية (درجة)")
-            plt.ylabel("العدد")
-            st.pyplot(fig)
+            try:
+                fig = plt.figure(figsize=(10, 4))
+                plt.hist(details['directions'], bins=36, range=(0, 360))
+                plt.title("توزيع اتجاهات النقاط المميزة")
+                plt.xlabel("الزاوية (درجة)")
+                plt.ylabel("العدد")
+                st.pyplot(fig)
+            except Exception as e:
+                st.error(f"حدث خطأ في عرض تحليل الاتجاهات: {str(e)}")
 
 def main():
     st.set_page_config(
