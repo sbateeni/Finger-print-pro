@@ -11,6 +11,7 @@ from fingerprint.feature_extractor import extract_features, match_features, dete
 from fingerprint.quality import calculate_quality
 import gc
 import pandas as pd
+import matplotlib.pyplot as plt
 
 # تعيين الحد الأقصى لحجم الصورة (بالبايت)
 MAX_IMAGE_SIZE = 8 * 1024 * 1024  # 8MB
@@ -180,6 +181,172 @@ def show_minutiae_details(features):
         st.metric("النوى", stats['نواة'])
         st.metric("الدلتا", stats['دلتا'])
 
+def analyze_fingerprint_details(image, features):
+    """تحليل تفصيلي للبصمة"""
+    details = {}
+    
+    try:
+        # تحليل الترددات
+        fft = np.fft.fft2(image)
+        fft_shift = np.fft.fftshift(fft)
+        magnitude_spectrum = 20 * np.log(np.abs(fft_shift) + 1)
+        details['frequency_analysis'] = magnitude_spectrum
+        
+        # تحليل الاتجاهات
+        if 'minutiae' in features:
+            directions = []
+            for type_name, contours in features['minutiae'].items():
+                for contour in contours:
+                    try:
+                        if len(contour) >= 5:
+                            ellipse = cv2.fitEllipse(contour)
+                            directions.append(ellipse[2])
+                    except:
+                        continue
+            details['directions'] = directions
+        
+        # تحليل النقاط المميزة
+        minutiae_stats = {}
+        for type_name, contours in features.get('minutiae', {}).items():
+            minutiae_stats[type_name] = {
+                'count': len(contours),
+                'areas': [cv2.contourArea(c) for c in contours],
+                'perimeters': [cv2.arcLength(c, True) for c in contours]
+            }
+        details['minutiae_stats'] = minutiae_stats
+        
+        # تحليل جودة الصورة
+        details['quality_metrics'] = {
+            'contrast': np.std(image),
+            'brightness': np.mean(image),
+            'sharpness': cv2.Laplacian(image, cv2.CV_64F).var()
+        }
+        
+        return details
+    except Exception as e:
+        st.error(f"حدث خطأ أثناء تحليل البصمة: {str(e)}")
+        return details
+
+def create_advanced_matching_image(image1, image2, features1, features2, matches):
+    """إنشاء صورة متقدمة للمطابقة"""
+    # إنشاء صورة تجمع بين البصمتين
+    h1, w1 = image1.shape[:2]
+    h2, w2 = image2.shape[:2]
+    max_h = max(h1, h2)
+    total_w = w1 + w2
+    matching_image = np.zeros((max_h, total_w, 3), dtype=np.uint8)
+    
+    # وضع البصمتين في الصورة
+    matching_image[:h1, :w1] = cv2.cvtColor(image1, cv2.COLOR_GRAY2BGR)
+    matching_image[:h2, w1:] = cv2.cvtColor(image2, cv2.COLOR_GRAY2BGR)
+    
+    # رسم النقاط المميزة
+    colors = {
+        'ridge_endings': (0, 255, 0),    # أخضر
+        'bifurcations': (255, 0, 0),     # أزرق
+        'islands': (0, 0, 255),          # أحمر
+        'dots': (255, 255, 0),           # أصفر
+        'cores': (255, 0, 255),          # وردي
+        'deltas': (0, 255, 255)          # سماوي
+    }
+    
+    # رسم النقاط المميزة للبصمة الأولى
+    for type_name, contours in features1.get('minutiae', {}).items():
+        color = colors[type_name]
+        for contour in contours:
+            try:
+                cv2.drawContours(matching_image, [contour], -1, color, 2)
+                M = cv2.moments(contour)
+                if M["m00"] != 0:
+                    cX = int(M["m10"] / M["m00"])
+                    cY = int(M["m01"] / M["m00"])
+                    cv2.circle(matching_image, (cX, cY), 5, color, -1)
+            except:
+                continue
+    
+    # رسم النقاط المميزة للبصمة الثانية
+    for type_name, contours in features2.get('minutiae', {}).items():
+        color = colors[type_name]
+        for contour in contours:
+            try:
+                contour_shifted = contour + np.array([w1, 0])
+                cv2.drawContours(matching_image, [contour_shifted], -1, color, 2)
+                M = cv2.moments(contour)
+                if M["m00"] != 0:
+                    cX = int(M["m10"] / M["m00"]) + w1
+                    cY = int(M["m01"] / M["m00"])
+                    cv2.circle(matching_image, (cX, cY), 5, color, -1)
+            except:
+                continue
+    
+    # رسم خطوط التطابق
+    for i, match in enumerate(matches):
+        try:
+            pt1 = (int(match[0][0]), int(match[0][1]))
+            pt2 = (int(match[1][0]) + w1, int(match[1][1]))
+            
+            # رسم دائرة حول النقاط المتطابقة
+            cv2.circle(matching_image, pt1, 8, (0, 255, 255), 2)
+            cv2.circle(matching_image, pt2, 8, (0, 255, 255), 2)
+            
+            # رسم خط التطابق
+            cv2.line(matching_image, pt1, pt2, (0, 255, 255), 2)
+            
+            # رسم رقم التطابق
+            cv2.putText(matching_image, str(i+1), 
+                       (pt1[0]-10, pt1[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+            cv2.putText(matching_image, str(i+1), 
+                       (pt2[0]-10, pt2[1]-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 2)
+        except:
+            continue
+    
+    return matching_image
+
+def show_advanced_analysis(stages):
+    """عرض التحليل المتقدم للبصمة"""
+    if 'processed' in stages and 'features' in stages:
+        # تحليل البصمة
+        details = analyze_fingerprint_details(stages['processed'], stages['features'])
+        
+        # عرض نتائج التحليل
+        st.markdown("### التحليل المتقدم للبصمة")
+        
+        # عرض إحصائيات النقاط المميزة
+        st.markdown("#### إحصائيات النقاط المميزة")
+        minutiae_stats = details.get('minutiae_stats', {})
+        for type_name, stats in minutiae_stats.items():
+            st.markdown(f"**{type_name}:**")
+            st.markdown(f"- العدد: {stats['count']}")
+            if stats['areas']:
+                st.markdown(f"- متوسط المساحة: {np.mean(stats['areas']):.2f}")
+                st.markdown(f"- متوسط المحيط: {np.mean(stats['perimeters']):.2f}")
+        
+        # عرض مقاييس جودة الصورة
+        st.markdown("#### مقاييس جودة الصورة")
+        quality_metrics = details.get('quality_metrics', {})
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("التباين", f"{quality_metrics.get('contrast', 0):.2f}")
+        with col2:
+            st.metric("السطوع", f"{quality_metrics.get('brightness', 0):.2f}")
+        with col3:
+            st.metric("الوضوح", f"{quality_metrics.get('sharpness', 0):.2f}")
+        
+        # عرض تحليل الترددات
+        if 'frequency_analysis' in details:
+            st.markdown("#### تحليل الترددات")
+            st.image(details['frequency_analysis'], use_container_width=True)
+        
+        # عرض تحليل الاتجاهات
+        if 'directions' in details and details['directions']:
+            st.markdown("#### تحليل الاتجاهات")
+            fig = plt.figure(figsize=(10, 4))
+            plt.hist(details['directions'], bins=36, range=(0, 360))
+            plt.title("توزيع اتجاهات النقاط المميزة")
+            plt.xlabel("الزاوية (درجة)")
+            plt.ylabel("العدد")
+            st.pyplot(fig)
+
 def main():
     st.set_page_config(
         page_title="نظام مقارنة البصمات",
@@ -321,39 +488,19 @@ def main():
                 stages = process_image_stages(file)
                 processed_stages.append(stages)
             
-            # عرض نتائج كل مرحلة
+            # عرض التحليل المتقدم لكل بصمة
             for i, stages in enumerate(processed_stages):
                 st.markdown(f'<div class="stage-container">', unsafe_allow_html=True)
                 st.markdown(f'<h3>البصمة {i+1}</h3>', unsafe_allow_html=True)
                 
-                # 🖼️ عرض مرحلة معالجة الصورة
-                if 'processed' in stages:
-                    st.markdown('<div class="stage-title"><span class="stage-icon">🖼️</span> معالجة الصورة</div>', unsafe_allow_html=True)
-                    st.image(stages['processed'], use_container_width=True)
-                    
-                    if 'edges' in stages:
-                        st.markdown("#### حواف البصمة")
-                        st.image(stages['edges'], use_container_width=True)
-                
-                # 📍 عرض مرحلة استخراج السمات
-                if 'features' in stages:
-                    st.markdown('<div class="stage-title"><span class="stage-icon">📍</span> استخراج السمات</div>', unsafe_allow_html=True)
-                    img_with_minutiae = draw_minutiae_with_matches(stages['processed'], stages['features'])
-                    st.image(img_with_minutiae, use_container_width=True)
-                    
-                    # عرض إحصائيات السمات
-                    show_minutiae_details(stages['features'])
-                
-                # 📁 عرض مرحلة حفظ السمات
-                if 'saved_features' in stages:
-                    st.markdown('<div class="stage-title"><span class="stage-icon">📁</span> حفظ السمات</div>', unsafe_allow_html=True)
-                    st.markdown(f"تم حفظ السمات في الملف: `{stages['saved_features']}`")
+                # عرض التحليل المتقدم
+                show_advanced_analysis(stages)
                 
                 st.markdown('</div>', unsafe_allow_html=True)
             
-            # 🔍 عرض مرحلة مطابقة البصمات
+            # عرض مقارنة متقدمة بين البصمات
             st.markdown('<div class="stage-container">', unsafe_allow_html=True)
-            st.markdown('<div class="stage-title"><span class="stage-icon">🔍</span> مطابقة البصمات</div>', unsafe_allow_html=True)
+            st.markdown('<div class="stage-title"><span class="stage-icon">🔍</span> مقارنة متقدمة</div>', unsafe_allow_html=True)
             
             for i in range(len(processed_stages)):
                 for j in range(i+1, len(processed_stages)):
@@ -364,6 +511,15 @@ def main():
                         match_score, matches = match_features(
                             processed_stages[i]['features'],
                             processed_stages[j]['features']
+                        )
+                        
+                        # إنشاء صورة المطابقة المتقدمة
+                        matching_image = create_advanced_matching_image(
+                            processed_stages[i]['processed'],
+                            processed_stages[j]['processed'],
+                            processed_stages[i]['features'],
+                            processed_stages[j]['features'],
+                            matches
                         )
                         
                         # عرض النتائج
@@ -378,25 +534,21 @@ def main():
                         
                         st.markdown('</div>', unsafe_allow_html=True)
                         
-                        # عرض الصور مع خطوط التطابق
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            img1_with_matches = draw_minutiae_with_matches(
-                                processed_stages[i]['processed'],
-                                processed_stages[i]['features'],
-                                matches,
-                                processed_stages[j]['processed']
-                            )
-                            st.image(img1_with_matches, caption=f"البصمة {i+1}", use_container_width=True)
+                        # عرض صورة المطابقة المتقدمة
+                        st.image(matching_image, use_container_width=True)
                         
-                        with col2:
-                            img2_with_matches = draw_minutiae_with_matches(
-                                processed_stages[j]['processed'],
-                                processed_stages[j]['features'],
-                                matches,
-                                processed_stages[i]['processed']
-                            )
-                            st.image(img2_with_matches, caption=f"البصمة {j+1}", use_container_width=True)
+                        # عرض تفاصيل التطابق
+                        st.markdown("#### تفاصيل التطابق")
+                        matches_data = []
+                        for k, match in enumerate(matches):
+                            matches_data.append({
+                                "رقم التطابق": k+1,
+                                f"إحداثيات البصمة {i+1}": f"({int(match[0][0])}, {int(match[0][1])})",
+                                f"إحداثيات البصمة {j+1}": f"({int(match[1][0])}, {int(match[1][1])})",
+                                "المسافة": f"{np.sqrt((match[0][0]-match[1][0])**2 + (match[0][1]-match[1][1])**2):.2f}"
+                            })
+                        
+                        st.table(matches_data)
             
             st.markdown('</div>', unsafe_allow_html=True)
             

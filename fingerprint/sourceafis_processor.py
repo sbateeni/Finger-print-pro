@@ -2,7 +2,8 @@ import os
 import json
 import numpy as np
 import cv2
-from sourceafis import FingerprintTemplate, FingerprintMatcher
+from fingerprint.preprocessor import preprocess_image
+from fingerprint.feature_extractor import extract_features, match_features
 
 class SourceAFISProcessor:
     def __init__(self):
@@ -30,53 +31,73 @@ class SourceAFISProcessor:
             # تحسين الحواف
             edges = cv2.Canny(denoised, 100, 200)
             
-            return denoised, edges
+            # استخراج السمات
+            features = extract_features(denoised)
+            
+            return {
+                'processed': denoised,
+                'edges': edges,
+                'features': features
+            }
         except Exception as e:
-            print(f"خطأ في معالجة الصورة: {str(e)}")
+            print(f"Error processing fingerprint: {str(e)}")
             return None
             
     def extract_minutiae(self, image_path):
-        """استخراج النقاط المميزة باستخدام SourceAFIS"""
+        """استخراج النقاط المميزة باستخدام OpenCV"""
         try:
             # قراءة الصورة
             img = cv2.imread(image_path)
             if img is None:
                 return None
                 
-            # إنشاء قالب البصمة
-            template = FingerprintTemplate(img)
+            # تحويل إلى تدرج رمادي
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             
-            # استخراج النقاط المميزة
-            minutiae = template.minutiae
+            # تحسين التباين
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+            enhanced = clahe.apply(gray)
             
+            # تخفيف الضوضاء
+            denoised = cv2.fastNlMeansDenoising(enhanced)
+            
+            # استخراج السمات
+            features = extract_features(denoised)
+            
+            if features is None or 'minutiae' not in features:
+                return None
+                
             # تحويل النقاط المميزة إلى التنسيق المطلوب
             formatted_minutiae = []
-            for m in minutiae:
-                formatted_minutiae.append({
-                    'x': int(m.position[0]),
-                    'y': int(m.position[1]),
-                    'theta': float(m.angle),
-                    'type': self._classify_minutiae(m.angle)
-                })
+            for type_name, contours in features['minutiae'].items():
+                for contour in contours:
+                    try:
+                        M = cv2.moments(contour)
+                        if M["m00"] != 0:
+                            cX = int(M["m10"] / M["m00"])
+                            cY = int(M["m01"] / M["m00"])
+                            
+                            # حساب الزاوية
+                            if len(contour) >= 5:
+                                ellipse = cv2.fitEllipse(contour)
+                                angle = ellipse[2]
+                            else:
+                                angle = 0
+                                
+                            formatted_minutiae.append({
+                                'x': cX,
+                                'y': cY,
+                                'theta': float(angle),
+                                'type': type_name
+                            })
+                    except:
+                        continue
             
             return formatted_minutiae
         except Exception as e:
             print(f"خطأ في استخراج النقاط المميزة: {str(e)}")
             return None
             
-    def _classify_minutiae(self, angle):
-        """تصنيف النقاط المميزة بناءً على الزاوية"""
-        # تصنيف بسيط بناءً على الزاوية
-        if angle < 45 or angle > 315:
-            return 'ridge_endings'
-        elif 45 <= angle <= 135:
-            return 'bifurcations'
-        elif 135 < angle <= 225:
-            return 'islands'
-        elif 225 < angle <= 315:
-            return 'dots'
-        return 'unknown'
-        
     def save_template(self, minutiae, filename):
         """حفظ قالب البصمة"""
         try:
@@ -88,26 +109,61 @@ class SourceAFISProcessor:
             print(f"خطأ في حفظ قالب البصمة: {str(e)}")
             return None
             
-    def match_fingerprints(self, minutiae1, minutiae2):
-        """مطابقة البصمات باستخدام SourceAFIS"""
+    def match_fingerprints(self, features1, features2):
+        """مقارنة البصمات"""
         try:
-            # إنشاء قوالب البصمات
-            template1 = FingerprintTemplate(minutiae1)
-            template2 = FingerprintTemplate(minutiae2)
+            if features1 is None or features2 is None:
+                return 0.0, []
             
-            # إنشاء مطابق
-            matcher = FingerprintMatcher()
+            # حساب نسبة التطابق
+            match_score, matches = match_features(features1, features2)
             
-            # إضافة القالب الأول
-            matcher.add(template1)
-            
-            # مطابقة القالب الثاني
-            match = matcher.match(template2)
-            
-            # الحصول على درجة المطابقة
-            score = match.score
-            
-            return score
+            return match_score, matches
         except Exception as e:
-            print(f"خطأ في مطابقة البصمات: {str(e)}")
-            return 0 
+            print(f"Error matching fingerprints: {str(e)}")
+            return 0.0, []
+
+def process_fingerprint(image):
+    """معالجة البصمة باستخدام OpenCV"""
+    try:
+        # تحويل الصورة إلى تدرج رمادي
+        if len(image.shape) == 3:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = image
+            
+        # تحسين التباين
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        enhanced = clahe.apply(gray)
+        
+        # تخفيف الضوضاء
+        denoised = cv2.fastNlMeansDenoising(enhanced)
+        
+        # تحسين الحواف
+        edges = cv2.Canny(denoised, 100, 200)
+        
+        # استخراج السمات
+        features = extract_features(denoised)
+        
+        return {
+            'processed': denoised,
+            'edges': edges,
+            'features': features
+        }
+    except Exception as e:
+        print(f"Error processing fingerprint: {str(e)}")
+        return None
+
+def match_fingerprints(features1, features2):
+    """مقارنة البصمات"""
+    try:
+        if features1 is None or features2 is None:
+            return 0.0, []
+            
+        # حساب نسبة التطابق
+        match_score, matches = match_features(features1, features2)
+        
+        return match_score, matches
+    except Exception as e:
+        print(f"Error matching fingerprints: {str(e)}")
+        return 0.0, [] 
