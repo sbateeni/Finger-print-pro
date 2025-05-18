@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from scipy.spatial.distance import cosine
+from .preprocessor import preprocess_image
 
 def detect_minutiae(image):
     """اكتشاف النقاط المميزة في البصمة"""
@@ -69,35 +70,25 @@ def detect_minutiae(image):
         return None
 
 def extract_features(image):
-    """استخراج المميزات من صورة البصمة"""
-    try:
-        # تحسين الصورة
-        enhanced = cv2.equalizeHist(image)
-        enhanced = cv2.GaussianBlur(enhanced, (5, 5), 0)
+    """
+    استخراج السمات من صورة البصمة
+    
+    Args:
+        image: صورة OpenCV
         
-        # اكتشاف النقاط المميزة
-        minutiae = detect_minutiae(enhanced)
-        
-        # استخراج المميزات باستخدام SIFT
-        sift = cv2.SIFT_create()
-        keypoints, descriptors = sift.detectAndCompute(enhanced, None)
-        
-        # تصنيف النقاط المميزة
-        if keypoints is not None:
-            minutiae_types = classify_minutiae(enhanced, keypoints)
-        else:
-            minutiae_types = []
-        
-        return {
-            'keypoints': keypoints,
-            'descriptors': descriptors,
-            'minutiae': minutiae,
-            'minutiae_types': minutiae_types
-        }
-        
-    except Exception as e:
-        print(f"خطأ في استخراج المميزات: {str(e)}")
-        return None
+    Returns:
+        dict: قاموس يحتوي على السمات المستخرجة
+    """
+    # معالجة الصورة
+    processed = preprocess_image(image)
+    
+    # استخراج النقاط المميزة
+    minutiae = detect_minutiae(processed['denoised'])
+    
+    return {
+        'minutiae': minutiae,
+        'processed_image': processed['denoised']
+    }
 
 def classify_minutiae(image, keypoints):
     """
@@ -145,45 +136,49 @@ def classify_minutiae(image, keypoints):
     return minutiae_types
 
 def match_features(features1, features2):
-    """مقارنة مميزات بصمتين"""
-    try:
-        if features1 is None or features2 is None:
-            return 0.0, []
-            
-        # التحقق من وجود المميزات
-        if not features1['keypoints'] or not features2['keypoints']:
-            return 0.0, []
-            
-        # إنشاء FLANN matcher
-        FLANN_INDEX_KDTREE = 1
-        index_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
-        search_params = dict(checks=50)
-        flann = cv2.FlannBasedMatcher(index_params, search_params)
+    """
+    مقارنة سمات بصمتين
+    
+    Args:
+        features1: سمات البصمة الأولى
+        features2: سمات البصمة الثانية
         
-        # مطابقة المميزات
-        matches = flann.knnMatch(features1['descriptors'], features2['descriptors'], k=2)
+    Returns:
+        tuple: (نسبة التطابق، قائمة النقاط المتطابقة)
+    """
+    matches = []
+    total_minutiae = 0
+    
+    # مقارنة كل نوع من النقاط المميزة
+    for type_name in features1['minutiae'].keys():
+        total_minutiae += len(features1['minutiae'][type_name])
         
-        # تطبيق نسبة Lowe
-        good_matches = []
-        for m, n in matches:
-            if m.distance < 0.7 * n.distance:
-                good_matches.append(m)
-        
-        # حساب نسبة التطابق
-        if len(good_matches) > 0:
-            match_score = (len(good_matches) / min(len(features1['keypoints']), len(features2['keypoints']))) * 100
-        else:
-            match_score = 0.0
-            
-        # تحضير التطابقات للعرض
-        matches_for_display = []
-        for match in good_matches:
-            pt1 = features1['keypoints'][match.queryIdx].pt
-            pt2 = features2['keypoints'][match.trainIdx].pt
-            matches_for_display.append((pt1, pt2))
-            
-        return match_score, matches_for_display
-        
-    except Exception as e:
-        print(f"خطأ في مقارنة المميزات: {str(e)}")
-        return 0.0, [] 
+        for contour1 in features1['minutiae'][type_name]:
+            M1 = cv2.moments(contour1)
+            if M1["m00"] != 0:
+                cX1 = int(M1["m10"] / M1["m00"])
+                cY1 = int(M1["m01"] / M1["m00"])
+                
+                # البحث عن أقرب نقطة في البصمة الثانية
+                min_dist = float('inf')
+                best_match = None
+                
+                for contour2 in features2['minutiae'][type_name]:
+                    M2 = cv2.moments(contour2)
+                    if M2["m00"] != 0:
+                        cX2 = int(M2["m10"] / M2["m00"])
+                        cY2 = int(M2["m01"] / M2["m00"])
+                        
+                        dist = np.sqrt((cX1 - cX2)**2 + (cY1 - cY2)**2)
+                        if dist < min_dist:
+                            min_dist = dist
+                            best_match = (cX2, cY2)
+                
+                # إذا كانت المسافة أقل من عتبة معينة، نعتبر النقطتين متطابقتين
+                if min_dist < 20:  # عتبة المسافة
+                    matches.append(((cX1, cY1), best_match))
+    
+    # حساب نسبة التطابق
+    match_score = (len(matches) / total_minutiae * 100) if total_minutiae > 0 else 0
+    
+    return match_score, matches 

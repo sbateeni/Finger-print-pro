@@ -42,32 +42,101 @@ def get_device_info():
     return info
 
 def preprocess_image(image):
-    """معالجة صورة البصمة"""
-    try:
-        # تحويل الصورة إلى تدرج رمادي
-        if len(image.shape) == 3:
-            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        else:
-            gray = image
+    """
+    معالجة الصورة وتحسين جودتها
+    
+    Args:
+        image: صورة OpenCV
+        
+    Returns:
+        dict: قاموس يحتوي على الصور المعالجة
+    """
+    # تحويل إلى تدرج رمادي
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    # تحسين التباين
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    enhanced = clahe.apply(gray)
+    
+    # تخفيف الضوضاء
+    denoised = cv2.fastNlMeansDenoising(enhanced)
+    
+    # تحسين الحواف
+    edges = cv2.Canny(denoised, 100, 200)
+    
+    return {
+        'gray': gray,
+        'enhanced': enhanced,
+        'denoised': denoised,
+        'edges': edges
+    }
 
-        # تحسين التباين
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-        enhanced = clahe.apply(gray)
+def enhance_contrast(image):
+    """
+    تحسين تباين الصورة
+    
+    Args:
+        image: صورة OpenCV
+        
+    Returns:
+        numpy.ndarray: الصورة المحسنة
+    """
+    # تحويل إلى تدرج رمادي
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    # تطبيق CLAHE
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+    enhanced = clahe.apply(gray)
+    
+    return enhanced
 
-        # تخفيف الضوضاء
-        denoised = cv2.fastNlMeansDenoising(enhanced)
+def remove_noise(image):
+    """
+    إزالة الضوضاء من الصورة
+    
+    Args:
+        image: صورة OpenCV
+        
+    Returns:
+        numpy.ndarray: الصورة بعد إزالة الضوضاء
+    """
+    # تطبيق فلتر إزالة الضوضاء
+    denoised = cv2.fastNlMeansDenoising(image)
+    
+    return denoised
 
-        # تحسين الحواف
-        kernel = np.array([[-1,-1,-1],
-                         [-1, 9,-1],
-                         [-1,-1,-1]])
-        sharpened = cv2.filter2D(denoised, -1, kernel)
+def detect_edges(image):
+    """
+    كشف حواف الصورة
+    
+    Args:
+        image: صورة OpenCV
+        
+    Returns:
+        numpy.ndarray: صورة الحواف
+    """
+    # تطبيق خوارزمية Canny
+    edges = cv2.Canny(image, 100, 200)
+    
+    return edges
 
-        return sharpened
-
-    except Exception as e:
-        print(f"Error in preprocessing: {str(e)}")
-        return image
+def normalize_image(image):
+    """
+    تطبيع الصورة
+    
+    Args:
+        image: صورة OpenCV
+        
+    Returns:
+        numpy.ndarray: الصورة المطابقة
+    """
+    # تحويل إلى تدرج رمادي
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    # تطبيع الصورة
+    normalized = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
+    
+    return normalized
 
 def enhance_image_quality(image):
     """

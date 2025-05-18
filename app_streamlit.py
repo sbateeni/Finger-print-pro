@@ -7,8 +7,10 @@ import base64
 import json
 import os
 from fingerprint.preprocessor import preprocess_image
-from fingerprint.feature_extractor import extract_features, match_features, detect_minutiae
+from fingerprint.feature_extractor import extract_features, match_features
 from fingerprint.quality import calculate_quality
+from fingerprint.analyzer import show_advanced_analysis
+from fingerprint.matcher import show_matching_results
 import gc
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -524,42 +526,13 @@ def main():
                             processed_stages[j]['features']
                         )
                         
-                        # إنشاء صورة المطابقة المتقدمة
-                        matching_image = create_advanced_matching_image(
-                            processed_stages[i]['processed'],
-                            processed_stages[j]['processed'],
-                            processed_stages[i]['features'],
-                            processed_stages[j]['features'],
+                        # عرض نتائج المطابقة
+                        show_matching_results(
+                            processed_stages[i],
+                            processed_stages[j],
+                            match_score,
                             matches
                         )
-                        
-                        # عرض النتائج
-                        st.markdown('<div class="match-info">', unsafe_allow_html=True)
-                        st.markdown(f"نسبة التطابق: {match_score:.2f}%")
-                        st.markdown(f"عدد النقاط المتطابقة: {len(matches)}")
-                        
-                        if match_score > 80:
-                            st.markdown('<div class="match-result match">البصمتان متطابقتان</div>', unsafe_allow_html=True)
-                        else:
-                            st.markdown('<div class="match-result no-match">البصمتان غير متطابقتين</div>', unsafe_allow_html=True)
-                        
-                        st.markdown('</div>', unsafe_allow_html=True)
-                        
-                        # عرض صورة المطابقة المتقدمة
-                        st.image(matching_image, use_container_width=True)
-                        
-                        # عرض تفاصيل التطابق
-                        st.markdown("#### تفاصيل التطابق")
-                        matches_data = []
-                        for k, match in enumerate(matches):
-                            matches_data.append({
-                                "رقم التطابق": k+1,
-                                f"إحداثيات البصمة {i+1}": f"({int(match[0][0])}, {int(match[0][1])})",
-                                f"إحداثيات البصمة {j+1}": f"({int(match[1][0])}, {int(match[1][1])})",
-                                "المسافة": f"{np.sqrt((match[0][0]-match[1][0])**2 + (match[0][1]-match[1][1])**2):.2f}"
-                            })
-                        
-                        st.table(matches_data)
             
             st.markdown('</div>', unsafe_allow_html=True)
             

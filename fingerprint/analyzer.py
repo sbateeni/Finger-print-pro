@@ -2,105 +2,188 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import streamlit as st
+from .quality import assess_image_quality
 
 def analyze_fingerprint_details(image, features):
-    """تحليل تفصيلي للبصمة"""
-    details = {}
+    """
+    تحليل تفصيلي للبصمة
     
-    try:
-        # تحليل الترددات
-        fft = np.fft.fft2(image)
-        fft_shift = np.fft.fftshift(fft)
-        magnitude_spectrum = 20 * np.log(np.abs(fft_shift) + 1)
+    Args:
+        image: صورة OpenCV
+        features: سمات البصمة
         
-        # تحويل القيم إلى نطاق [0, 1]
-        magnitude_spectrum = (magnitude_spectrum - magnitude_spectrum.min()) / (magnitude_spectrum.max() - magnitude_spectrum.min())
-        details['frequency_analysis'] = magnitude_spectrum
+    Returns:
+        dict: قاموس يحتوي على نتائج التحليل
+    """
+    # تحليل التردد
+    frequency_analysis = analyze_frequency(image)
+    
+    # تحليل الاتجاهات
+    direction_analysis = analyze_directions(features)
+    
+    # إحصائيات النقاط المميزة
+    minutiae_stats = calculate_minutiae_statistics(features)
+    
+    # تقييم جودة الصورة
+    quality_metrics = assess_image_quality(image)
+    
+    return {
+        'frequency': frequency_analysis,
+        'directions': direction_analysis,
+        'minutiae_stats': minutiae_stats,
+        'quality': quality_metrics
+    }
+
+def analyze_frequency(image):
+    """
+    تحليل التردد في البصمة
+    
+    Args:
+        image: صورة OpenCV
         
-        # تحليل الاتجاهات
-        if 'minutiae' in features:
-            directions = []
-            for type_name, contours in features['minutiae'].items():
-                for contour in contours:
-                    try:
-                        if len(contour) >= 5:
-                            ellipse = cv2.fitEllipse(contour)
-                            directions.append(ellipse[2])
-                    except:
-                        continue
-            details['directions'] = directions
+    Returns:
+        dict: قاموس يحتوي على نتائج تحليل التردد
+    """
+    # تطبيق تحويل فورييه
+    f = np.fft.fft2(image)
+    fshift = np.fft.fftshift(f)
+    magnitude_spectrum = 20 * np.log(np.abs(fshift) + 1)
+    
+    # حساب التوزيع الترددي
+    freq_distribution = np.histogram(magnitude_spectrum.flatten(), bins=50)[0]
+    
+    return {
+        'magnitude_spectrum': magnitude_spectrum,
+        'distribution': freq_distribution
+    }
+
+def analyze_directions(features):
+    """
+    تحليل اتجاهات النقاط المميزة
+    
+    Args:
+        features: سمات البصمة
         
-        # تحليل النقاط المميزة
-        minutiae_stats = {}
-        for type_name, contours in features.get('minutiae', {}).items():
-            minutiae_stats[type_name] = {
-                'count': len(contours),
-                'areas': [cv2.contourArea(c) for c in contours],
-                'perimeters': [cv2.arcLength(c, True) for c in contours]
-            }
-        details['minutiae_stats'] = minutiae_stats
+    Returns:
+        dict: قاموس يحتوي على نتائج تحليل الاتجاهات
+    """
+    directions = []
+    
+    # حساب اتجاهات النقاط المميزة
+    for type_name, contours in features['minutiae'].items():
+        for contour in contours:
+            if len(contour) >= 5:
+                # حساب الإهليلج المناسب
+                (x, y), (MA, ma), angle = cv2.fitEllipse(contour)
+                directions.append(angle)
+    
+    # حساب التوزيع الاتجاهي
+    if directions:
+        direction_hist = np.histogram(directions, bins=36, range=(0, 360))[0]
+    else:
+        direction_hist = np.zeros(36)
+    
+    return {
+        'directions': directions,
+        'histogram': direction_hist
+    }
+
+def calculate_minutiae_statistics(features):
+    """
+    حساب إحصائيات النقاط المميزة
+    
+    Args:
+        features: سمات البصمة
         
-        # تحليل جودة الصورة
-        details['quality_metrics'] = {
-            'contrast': np.std(image),
-            'brightness': np.mean(image),
-            'sharpness': cv2.Laplacian(image, cv2.CV_64F).var()
-        }
+    Returns:
+        dict: قاموس يحتوي على الإحصائيات
+    """
+    stats = {
+        'total': 0,
+        'by_type': {},
+        'areas': [],
+        'perimeters': []
+    }
+    
+    # حساب الإحصائيات لكل نوع من النقاط المميزة
+    for type_name, contours in features['minutiae'].items():
+        stats['by_type'][type_name] = len(contours)
+        stats['total'] += len(contours)
         
-        return details
-    except Exception as e:
-        st.error(f"حدث خطأ أثناء تحليل البصمة: {str(e)}")
-        return details
+        # حساب المساحات والمحيطات
+        for contour in contours:
+            area = cv2.contourArea(contour)
+            perimeter = cv2.arcLength(contour, True)
+            stats['areas'].append(area)
+            stats['perimeters'].append(perimeter)
+    
+    # حساب المتوسطات
+    if stats['areas']:
+        stats['avg_area'] = np.mean(stats['areas'])
+        stats['avg_perimeter'] = np.mean(stats['perimeters'])
+    else:
+        stats['avg_area'] = 0
+        stats['avg_perimeter'] = 0
+    
+    return stats
 
 def show_advanced_analysis(stages):
-    """عرض التحليل المتقدم للبصمة"""
-    if 'processed' in stages and 'features' in stages:
-        # تحليل البصمة
-        details = analyze_fingerprint_details(stages['processed'], stages['features'])
+    """
+    عرض نتائج التحليل المتقدم
+    
+    Args:
+        stages: مراحل معالجة البصمة
+    """
+    if 'features' not in stages:
+        return
+    
+    # عرض إحصائيات النقاط المميزة
+    st.markdown("#### إحصائيات النقاط المميزة")
+    minutiae_stats = calculate_minutiae_statistics(stages['features'])
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.write("إجمالي النقاط المميزة:", minutiae_stats['total'])
+        st.write("متوسط المساحة:", f"{minutiae_stats['avg_area']:.2f}")
+        st.write("متوسط المحيط:", f"{minutiae_stats['avg_perimeter']:.2f}")
+    
+    with col2:
+        st.write("التوزيع حسب النوع:")
+        for type_name, count in minutiae_stats['by_type'].items():
+            st.write(f"- {type_name}: {count}")
+    
+    # عرض تحليل التردد
+    if 'processed' in stages:
+        st.markdown("#### تحليل التردد")
+        frequency_analysis = analyze_frequency(stages['processed'])
         
-        # عرض نتائج التحليل
-        st.markdown("### التحليل المتقدم للبصمة")
+        fig, ax = plt.subplots(figsize=(10, 4))
+        ax.plot(frequency_analysis['distribution'])
+        ax.set_title("توزيع التردد")
+        st.pyplot(fig)
+    
+    # عرض تحليل الاتجاهات
+    st.markdown("#### تحليل الاتجاهات")
+    direction_analysis = analyze_directions(stages['features'])
+    
+    fig, ax = plt.subplots(figsize=(10, 4))
+    ax.bar(range(36), direction_analysis['histogram'])
+    ax.set_title("توزيع الاتجاهات")
+    ax.set_xlabel("الاتجاه (درجة)")
+    ax.set_ylabel("العدد")
+    st.pyplot(fig)
+    
+    # عرض مقاييس الجودة
+    if 'processed' in stages:
+        st.markdown("#### مقاييس الجودة")
+        quality_metrics = assess_image_quality(stages['processed'])
         
-        # عرض إحصائيات النقاط المميزة
-        st.markdown("#### إحصائيات النقاط المميزة")
-        minutiae_stats = details.get('minutiae_stats', {})
-        for type_name, stats in minutiae_stats.items():
-            st.markdown(f"**{type_name}:**")
-            st.markdown(f"- العدد: {stats['count']}")
-            if stats['areas']:
-                st.markdown(f"- متوسط المساحة: {np.mean(stats['areas']):.2f}")
-                st.markdown(f"- متوسط المحيط: {np.mean(stats['perimeters']):.2f}")
-        
-        # عرض مقاييس جودة الصورة
-        st.markdown("#### مقاييس جودة الصورة")
-        quality_metrics = details.get('quality_metrics', {})
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.metric("التباين", f"{quality_metrics.get('contrast', 0):.2f}")
+            st.metric("الجودة العامة", f"{quality_metrics['overall_quality']:.1f}%")
         with col2:
-            st.metric("السطوع", f"{quality_metrics.get('brightness', 0):.2f}")
+            st.metric("التباين", f"{quality_metrics['contrast']:.2f}")
         with col3:
-            st.metric("الوضوح", f"{quality_metrics.get('sharpness', 0):.2f}")
+            st.metric("الوضوح", f"{quality_metrics['sharpness']:.2f}")
         
-        # عرض تحليل الترددات
-        if 'frequency_analysis' in details:
-            st.markdown("#### تحليل الترددات")
-            try:
-                # تحويل الصورة إلى تنسيق مناسب للعرض
-                freq_image = (details['frequency_analysis'] * 255).astype(np.uint8)
-                st.image(freq_image, use_container_width=True)
-            except Exception as e:
-                st.error(f"حدث خطأ في عرض تحليل الترددات: {str(e)}")
-        
-        # عرض تحليل الاتجاهات
-        if 'directions' in details and details['directions']:
-            st.markdown("#### تحليل الاتجاهات")
-            try:
-                fig = plt.figure(figsize=(10, 4))
-                plt.hist(details['directions'], bins=36, range=(0, 360))
-                plt.title("توزيع اتجاهات النقاط المميزة")
-                plt.xlabel("الزاوية (درجة)")
-                plt.ylabel("العدد")
-                st.pyplot(fig)
-            except Exception as e:
-                st.error(f"حدث خطأ في عرض تحليل الاتجاهات: {str(e)}") 
+        st.write("مستوى الجودة:", quality_metrics['quality_level']) 
