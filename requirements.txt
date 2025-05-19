@@ -9,6 +9,7 @@ pandas>=2.0.3
 psutil>=5.9.5
 setuptools>=68.0.0
 wheel>=0.40.0
-torch>=2.0.0
-torchvision>=0.15.0
+# PyTorch is optional
+# torch>=2.0.0
+# torchvision>=0.15.0
 --only-binary :all:
