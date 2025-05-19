@@ -28,21 +28,8 @@ def get_device_info():
         'cpu_count': psutil.cpu_count(),
         'memory': psutil.virtual_memory().total,
         'platform': os.name,
-        'cuda_available': False,
         'max_image_size': (1024, 1024)  # Default max image size
     }
-    
-    try:
-        import torch
-        info['cuda_available'] = torch.cuda.is_available()
-        if info['cuda_available']:
-            info['cuda_device'] = torch.cuda.get_device_name(0)
-            info['cuda_memory'] = torch.cuda.get_device_properties(0).total_memory
-    except ImportError:
-        print("PyTorch is not available. Using CPU only.")
-    except Exception as e:
-        print(f"Warning: CUDA check failed: {str(e)}")
-    
     return info
 
 def preprocess_image(image):

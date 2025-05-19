@@ -394,47 +394,40 @@ def create_advanced_matching_image(image1, image2, features1, features2, matches
     return matching_image
 
 def show_matching_results(stages1, stages2, match_score, matches):
-    """
-    عرض نتائج المطابقة
-    
-    Args:
-        stages1: مراحل معالجة البصمة الأولى
-        stages2: مراحل معالجة البصمة الثانية
-        match_score: نسبة التطابق
-        matches: قائمة النقاط المتطابقة
-    """
-    # عرض نسبة التطابق
-    st.markdown('<div class="match-info">', unsafe_allow_html=True)
-    st.markdown(f"نسبة التطابق: {match_score:.2f}%")
-    st.markdown(f"عدد النقاط المتطابقة: {len(matches)}")
-    
-    if match_score > 80:
-        st.markdown('<div class="match-result match">البصمتان متطابقتان</div>', unsafe_allow_html=True)
-    else:
-        st.markdown('<div class="match-result no-match">البصمتان غير متطابقتين</div>', unsafe_allow_html=True)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
-    
-    # إنشاء وعرض صورة المطابقة
-    if 'processed' in stages1 and 'processed' in stages2:
-        matching_image = create_advanced_matching_image(
-            stages1['processed'],
-            stages2['processed'],
-            stages1['features'],
-            stages2['features'],
-            matches
-        )
-        st.image(matching_image, use_container_width=True)
-    
-    # عرض تفاصيل التطابق
-    st.markdown("#### تفاصيل التطابق")
-    matches_data = []
-    for i, (pt1, pt2) in enumerate(matches):
-        matches_data.append({
-            "رقم التطابق": i+1,
-            "إحداثيات البصمة 1": f"({int(pt1[0])}, {int(pt1[1])})",
-            "إحداثيات البصمة 2": f"({int(pt2[0])}, {int(pt2[1])})",
-            "المسافة": f"{np.sqrt((pt1[0]-pt2[0])**2 + (pt1[1]-pt2[1])**2):.2f}"
-        })
-    
-    st.table(matches_data) 
+    """عرض نتائج المطابقة بين بصمتين"""
+    try:
+        # عرض نسبة التطابق
+        st.markdown(f"### نسبة التطابق: {match_score:.2f}%")
+        
+        # عرض الصور مع النقاط المميزة
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("#### البصمة 1")
+            if 'processed' in stages1:
+                st.image(stages1['processed'], use_column_width=True)
+        
+        with col2:
+            st.markdown("#### البصمة 2")
+            if 'processed' in stages2:
+                st.image(stages2['processed'], use_column_width=True)
+        
+        # عرض النقاط المميزة
+        if 'features' in stages1 and 'features' in stages2:
+            st.markdown("#### النقاط المميزة")
+            show_minutiae_details(stages1['features'])
+            show_minutiae_details(stages2['features'])
+            
+            # عرض خطوط التطابق
+            if matches:
+                st.markdown("#### خطوط التطابق")
+                matching_image = create_advanced_matching_image(
+                    stages1['processed'],
+                    stages2['processed'],
+                    stages1['features'],
+                    stages2['features'],
+                    matches
+                )
+                st.image(matching_image, use_column_width=True)
+    except Exception as e:
+        st.error(f"حدث خطأ أثناء عرض نتائج المطابقة: {str(e)}") 

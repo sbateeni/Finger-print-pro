@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 from scipy.spatial.distance import cosine
 from .preprocessor import preprocess_image
+from typing import Dict, List, Tuple, Optional
+import streamlit as st
 
 def detect_minutiae(image):
     """اكتشاف النقاط المميزة في البصمة"""
