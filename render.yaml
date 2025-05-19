@@ -1,19 +1,13 @@
 services:
   - type: web
-    name: fingerprint-matcher
+    name: fingerprint-matching
     env: python
-    buildCommand: |
-      pip install --upgrade pip
-      pip install -r requirements.txt
-    startCommand: gunicorn app:app --config gunicorn_config.py
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.0
-      - key: PORT
-        value: 10000
-      - key: MAX_IMAGE_SIZE
-        value: 8388608
-      - key: DATA_DIR
-        value: /tmp/data
+        value: 3.9.0
+      - key: SECRET_KEY
+        generateValue: true
     healthCheckPath: /
     autoDeploy: true 
