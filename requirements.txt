@@ -9,4 +9,5 @@ pandas>=2.0.3
 psutil>=5.9.5
 setuptools>=68.0.0
 wheel>=0.40.0
+watchdog>=3.0.0
 --only-binary :all:

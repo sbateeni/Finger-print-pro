@@ -351,12 +351,12 @@ def show_matching_results(stages1, stages2, match_score, matches):
         with col1:
             st.markdown("#### البصمة 1")
             if 'processed' in stages1:
-                st.image(stages1['processed'], use_column_width=True)
+                st.image(stages1['processed'], use_container_width=True)
         
         with col2:
             st.markdown("#### البصمة 2")
             if 'processed' in stages2:
-                st.image(stages2['processed'], use_column_width=True)
+                st.image(stages2['processed'], use_container_width=True)
         
         # عرض النقاط المميزة
         if 'features' in stages1 and 'features' in stages2:
@@ -374,6 +374,6 @@ def show_matching_results(stages1, stages2, match_score, matches):
                     stages2['features'],
                     matches
                 )
-                st.image(matching_image, use_column_width=True)
+                st.image(matching_image, use_container_width=True)
     except Exception as e:
         st.error(f"حدث خطأ أثناء عرض نتائج المطابقة: {str(e)}") 
