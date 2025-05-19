@@ -339,6 +339,33 @@ def create_advanced_matching_image(image1, image2, features1, features2, matches
     
     return matching_image
 
+def show_minutiae_details(features):
+    """عرض تفاصيل النقاط المميزة"""
+    if features is None or 'minutiae' not in features:
+        return
+        
+    # عرض إحصائيات النقاط المميزة
+    st.markdown("#### إحصائيات النقاط المميزة")
+    stats = {
+        'نهاية نتوء': len(features['minutiae'].get('ridge_endings', [])),
+        'تفرع': len(features['minutiae'].get('bifurcations', [])),
+        'جزيرة': len(features['minutiae'].get('islands', [])),
+        'نقطة': len(features['minutiae'].get('dots', [])),
+        'نواة': len(features['minutiae'].get('cores', [])),
+        'دلتا': len(features['minutiae'].get('deltas', []))
+    }
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("نهايات النتوءات", stats['نهاية نتوء'])
+        st.metric("التفرعات", stats['تفرع'])
+    with col2:
+        st.metric("الجزر", stats['جزيرة'])
+        st.metric("النقاط", stats['نقطة'])
+    with col3:
+        st.metric("النوى", stats['نواة'])
+        st.metric("الدلتا", stats['دلتا'])
+
 def show_matching_results(stages1, stages2, match_score, matches):
     """عرض نتائج المطابقة بين بصمتين"""
     try:
