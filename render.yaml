@@ -10,11 +10,15 @@ services:
     startCommand: gunicorn app:app --config gunicorn.conf.py --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
-        value: 3.9.0
+        value: 3.11.11
       - key: SECRET_KEY
         generateValue: true
       - key: PORT
         value: 10000
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_APP
+        value: app.py
     healthCheckPath: /
     autoDeploy: true
     disk:

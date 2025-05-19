@@ -1,10 +1,12 @@
 import multiprocessing
+import os
 
 # Number of worker processes
 workers = multiprocessing.cpu_count() * 2 + 1
 
 # Host and port
-bind = "0.0.0.0:10000"
+port = int(os.environ.get('PORT', 10000))
+bind = f"0.0.0.0:{port}"
 
 # Timeout
 timeout = 120
