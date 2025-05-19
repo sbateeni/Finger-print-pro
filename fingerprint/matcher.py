@@ -4,13 +4,7 @@ from .feature_extractor import match_features
 from scipy.spatial.distance import cosine
 import streamlit as st
 from typing import Dict, List, Tuple, Optional
-
-try:
-    import torch
-    TORCH_AVAILABLE = True
-except ImportError:
-    TORCH_AVAILABLE = False
-    st.warning("PyTorch is not available. Some advanced features may be limited.")
+import gc
 
 def match_fingerprints(features1, features2, threshold=0.3):
     """
@@ -24,8 +18,6 @@ def match_fingerprints(features1, features2, threshold=0.3):
     Returns:
         dict: نتائج المطابقة
     """
-    device_info = get_device_info()
-    
     # التحقق من وجود مميزات كافية
     if features1['count'] < 5 or features2['count'] < 5:
         return {
@@ -87,8 +79,6 @@ def calculate_confidence_score(features1, features2, match_result):
     Returns:
         float: درجة الثقة
     """
-    device_info = get_device_info()
-    
     # حساب نسبة النقاط المتطابقة
     match_ratio = match_result['count'] / min(features1['count'], features2['count'])
     
@@ -117,8 +107,6 @@ def calculate_similarity_score(features1, features2):
     Returns:
         float: درجة التشابه
     """
-    device_info = get_device_info()
-    
     # مقارنة المميزات
     match_result = match_features(features1, features2)
     
@@ -193,8 +181,6 @@ def find_best_match(query_features, database_features, threshold=0.3):
     Returns:
         dict: أفضل نتيجة مطابقة
     """
-    device_info = get_device_info()
-    
     best_match = {
         'index': -1,
         'score': 0,
@@ -202,41 +188,17 @@ def find_best_match(query_features, database_features, threshold=0.3):
         'confidence': 0
     }
     
-    # استخدام GPU إذا كان متاحاً
-    if device_info['gpu_available']:
-        # تحويل المميزات إلى tensors
-        query_desc = torch.from_numpy(query_features['descriptors']).cuda()
-        db_desc = torch.stack([torch.from_numpy(f['descriptors']).cuda() for f in database_features])
+    # استخدام CPU
+    for i, db_features in enumerate(database_features):
+        match_result = match_fingerprints(query_features, db_features, threshold)
         
-        # حساب المسافات
-        distances = torch.cdist(query_desc, db_desc)
-        
-        # العثور على أفضل تطابق
-        min_distances, indices = torch.min(distances, dim=1)
-        match_scores = 1 - min_distances / torch.max(distances)
-        
-        best_idx = torch.argmax(match_scores).item()
-        best_score = match_scores[best_idx].item()
-        
-        if best_score >= threshold:
+        if match_result['score'] > best_match['score'] and match_result['is_match']:
             best_match = {
-                'index': best_idx,
-                'score': best_score,
-                'is_match': True,
-                'confidence': best_score
+                'index': i,
+                'score': match_result['score'],
+                'is_match': match_result['is_match'],
+                'confidence': match_result['confidence']
             }
-    else:
-        # استخدام CPU
-        for i, db_features in enumerate(database_features):
-            match_result = match_fingerprints(query_features, db_features, threshold)
-            
-            if match_result['score'] > best_match['score'] and match_result['is_match']:
-                best_match = {
-                    'index': i,
-                    'score': match_result['score'],
-                    'is_match': match_result['is_match'],
-                    'confidence': match_result['confidence']
-                }
     
     # تنظيف الذاكرة
     gc.collect()
@@ -253,8 +215,6 @@ def extract_features(image):
     Returns:
         numpy.ndarray: مصفوفة المميزات
     """
-    device_info = get_device_info()
-    
     # استخدام SIFT لاستخراج النقاط المميزة
     sift = cv2.SIFT_create(
         nfeatures=0,  # عدد غير محدود من النقاط المميزة
@@ -284,29 +244,15 @@ def compare_fingerprints(fp1_features, fp2_features):
     Returns:
         float: درجة التطابق بين البصمتين
     """
-    device_info = get_device_info()
-    
     if len(fp1_features) == 0 or len(fp2_features) == 0:
         return 0.0
     
-    # استخدام GPU إذا كان متاحاً
-    if device_info['gpu_available']:
-        fp1_tensor = torch.from_numpy(fp1_features).cuda()
-        fp2_tensor = torch.from_numpy(fp2_features).cuda()
-        
-        # حساب متوسط المميزات
-        fp1_mean = torch.mean(fp1_tensor, dim=0)
-        fp2_mean = torch.mean(fp2_tensor, dim=0)
-        
-        # حساب درجة التطابق
-        similarity = 1 - torch.nn.functional.cosine_similarity(fp1_mean, fp2_mean, dim=0).item()
-    else:
-        # استخدام CPU
-        fp1_mean = np.mean(fp1_features, axis=0)
-        fp2_mean = np.mean(fp2_features, axis=0)
-        
-        # حساب درجة التطابق
-        similarity = 1 - cosine(fp1_mean, fp2_mean)
+    # استخدام CPU
+    fp1_mean = np.mean(fp1_features, axis=0)
+    fp2_mean = np.mean(fp2_features, axis=0)
+    
+    # حساب درجة التطابق
+    similarity = 1 - cosine(fp1_mean, fp2_mean)
     
     # تحويل درجة التطابق إلى نسبة مئوية
     match_score = max(0, min(100, similarity * 100))
