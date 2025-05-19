@@ -37,7 +37,7 @@ def process_image_stages(image_file):
     try:
         # تحويل ملف Streamlit إلى صورة OpenCV
         file_bytes = np.asarray(bytearray(image_file.read()), dtype=np.uint8)
-        img = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+        img = cv2.imdecode(file_bytes, cv2.IMREAD_UNCHANGED)
         
         if img is None:
             st.error("فشل في قراءة الصورة")
@@ -49,7 +49,10 @@ def process_image_stages(image_file):
             if len(img.shape) == 2:  # صورة بتدرج رمادي
                 gray = img
             elif len(img.shape) == 3:  # صورة ملونة
-                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                if img.shape[2] == 4:  # صورة RGBA
+                    gray = cv2.cvtColor(img, cv2.COLOR_RGBA2GRAY)
+                else:  # صورة RGB
+                    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
             else:
                 st.error("تنسيق الصورة غير مدعوم")
                 return stages
