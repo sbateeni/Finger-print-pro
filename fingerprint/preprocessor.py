@@ -51,25 +51,37 @@ def preprocess_image(image):
     Returns:
         dict: قاموس يحتوي على الصور المعالجة
     """
-    # تحويل إلى تدرج رمادي
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    
-    # تحسين التباين
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-    enhanced = clahe.apply(gray)
-    
-    # تخفيف الضوضاء
-    denoised = cv2.fastNlMeansDenoising(enhanced)
-    
-    # تحسين الحواف
-    edges = cv2.Canny(denoised, 100, 200)
-    
-    return {
-        'gray': gray,
-        'enhanced': enhanced,
-        'denoised': denoised,
-        'edges': edges
-    }
+    try:
+        # التحقق من عدد القنوات وتحويلها إذا لزم الأمر
+        if len(image.shape) == 2:  # صورة بتدرج رمادي
+            gray = image
+        elif len(image.shape) == 3:  # صورة ملونة
+            if image.shape[2] == 4:  # صورة RGBA
+                gray = cv2.cvtColor(image, cv2.COLOR_RGBA2GRAY)
+            else:  # صورة RGB
+                gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        else:
+            raise ValueError("تنسيق الصورة غير مدعوم")
+        
+        # تحسين التباين
+        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        enhanced = clahe.apply(gray)
+        
+        # تخفيف الضوضاء
+        denoised = cv2.fastNlMeansDenoising(enhanced)
+        
+        # تحسين الحواف
+        edges = cv2.Canny(denoised, 100, 200)
+        
+        return {
+            'gray': gray,
+            'enhanced': enhanced,
+            'denoised': denoised,
+            'edges': edges
+        }
+    except Exception as e:
+        print(f"خطأ في معالجة الصورة: {str(e)}")
+        return None
 
 def enhance_contrast(image):
     """

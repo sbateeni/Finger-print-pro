@@ -79,16 +79,22 @@ def extract_features(image):
     Returns:
         dict: قاموس يحتوي على السمات المستخرجة
     """
-    # معالجة الصورة
-    processed = preprocess_image(image)
-    
-    # استخراج النقاط المميزة
-    minutiae = detect_minutiae(processed['denoised'])
-    
-    return {
-        'minutiae': minutiae,
-        'processed_image': processed['denoised']
-    }
+    try:
+        # معالجة الصورة
+        processed = preprocess_image(image)
+        if processed is None:
+            return None
+        
+        # استخراج النقاط المميزة
+        minutiae = detect_minutiae(processed['denoised'])
+        
+        return {
+            'minutiae': minutiae,
+            'processed_image': processed['denoised']
+        }
+    except Exception as e:
+        print(f"خطأ في استخراج السمات: {str(e)}")
+        return None
 
 def classify_minutiae(image, keypoints):
     """
