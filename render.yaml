@@ -2,10 +2,12 @@ services:
   - type: web
     name: fingerprint-matching
     env: python
+    runtime: python
     buildCommand: |
+      python -m pip install --upgrade pip
       pip install -r requirements.txt
       mkdir -p uploads results
-    startCommand: gunicorn app:app --config gunicorn.conf.py
+    startCommand: gunicorn app:app --config gunicorn.conf.py --bind 0.0.0.0:$PORT
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
