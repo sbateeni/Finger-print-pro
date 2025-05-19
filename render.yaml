@@ -2,11 +2,13 @@ services:
   - type: web
     name: fingerprint-matcher
     env: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app_flask:app --config gunicorn_config.py
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: gunicorn app:app --config gunicorn_config.py
     envVars:
       - key: PYTHON_VERSION
-        value: 3.9.0
+        value: 3.11.0
       - key: PORT
         value: 10000
       - key: MAX_IMAGE_SIZE
