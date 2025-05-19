@@ -9,12 +9,15 @@ from utils.match_fingerprint import match_fingerprint
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', os.urandom(24))
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['RESULTS_FOLDER'] = 'results'
+
+# تعديل مسارات المجلدات لتكون مطلقة
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+app.config['UPLOAD_FOLDER'] = os.path.join(BASE_DIR, 'uploads')
+app.config['RESULTS_FOLDER'] = os.path.join(BASE_DIR, 'results')
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['ALLOWED_EXTENSIONS'] = {'png', 'jpg', 'jpeg', 'tif', 'tiff'}
 
-# Create necessary directories
+# إنشاء المجلدات إذا لم تكن موجودة
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['RESULTS_FOLDER'], exist_ok=True)
 
@@ -109,5 +112,5 @@ def upload_file():
     return redirect(url_for('index'))
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port) 
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port, debug=False) 
