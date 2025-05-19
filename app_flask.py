@@ -12,11 +12,15 @@ import base64
 app = Flask(__name__)
 
 # تعيين المسارات
-DATA_DIR = "data"
+DATA_DIR = os.getenv('DATA_DIR', 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # تعيين الحد الأقصى لحجم الصورة (بالبايت)
-MAX_IMAGE_SIZE = 8 * 1024 * 1024  # 8MB
+MAX_IMAGE_SIZE = int(os.getenv('MAX_IMAGE_SIZE', 8 * 1024 * 1024))  # 8MB
+
+# تكوين التطبيق
+app.config['MAX_CONTENT_LENGTH'] = MAX_IMAGE_SIZE
+app.config['UPLOAD_FOLDER'] = DATA_DIR
 
 def process_image(image_data):
     """معالجة الصورة واستخراج السمات"""
@@ -237,4 +241,5 @@ def create_matching_image(image1, image2, features1, features2, matches):
     return matching_image
 
 if __name__ == '__main__':
-    app.run(debug=True) 
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port) 
